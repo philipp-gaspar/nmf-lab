@@ -10,13 +10,15 @@ class NMF(object):
     """
     Base class for NMF algorithms.
     """
+    default_max_iter = 100
 
     def __init__(self):
-        self.default_max_iter = 100
+        # NMF is a Base class and cannot be instantiated
+        raise NotImplementedError()
 
     def run(self, Y, j,
             init=None,
-            max_iter=self.default_max_iter,
+            max_iter=default_max_iter,
             cost_function='frobenius',
             verbose=True):
         """
@@ -40,12 +42,13 @@ class NMF(object):
         A: factor matrix, shape (i, j)
         B: coefficient matrix, shape (t, j)
         """
+        self.cost_function = cost_function
         self.info = {'j': j,
-                     'A_dim_1': A.shape[0],
-                     'A_dim_2:' A.shape[1],
-                     'A_type': str(A.__class__),
+                     'Y_dim_1': Y.shape[0],
+                     'Y_dim_2': Y.shape[1],
+                     'Y_type': str(Y.__class__),
                      'max_iter': max_iter,
-                     'cost_function': cost_function,
+                     'cost_function': self.cost_function,
                      'verbose': verbose}
 
         # Initialization of factor matrices
@@ -110,7 +113,7 @@ class NMF_HALS(NMF):
     def iter_solver(self, Y, A, B, j, it):
         """
         """
-        if cost_function != 'frobenius':
+        if self.cost_function != 'frobenius':
             print "Cost function not valid for HALS algorithm."
             print "Try: 'frobenius'."
             sys.exit()
@@ -145,7 +148,7 @@ class NMF_HALS(NMF):
         def iter_solver(self, Y, A, B, j, it):
             """
             """
-            if cost_function == 'frobenius':
+            if self.cost_function == 'frobenius':
                 # Update B
                 YtA = Y.T.dot(A)
                 numerator = B * YtA
