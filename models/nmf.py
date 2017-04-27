@@ -69,13 +69,22 @@ class NMF(object):
         # Algorithm specific initialization
         A, B = self.initializer(A, B)
 
+        # Dictionary to save the results for each iteration
+        self.results = {'cost_function': self.cost_function,
+                        'iter': [],
+                        'rel_error': []}
+
         # Iteration Process
         for i in range(1, self.info['max_iter'] + 1):
-            A, B = self.iter_solver(Y, A, B, j, i)
+            A, B, rel_error = self.iter_solver(Y, A, B, j, i)
+            self.results['iter'].append(i)
+            self.results['rel_error'].append(rel_error)
 
         # Normalize matrices A and B in order to not
         # modify the product A.dot(B.T)
         A, B = scale_factor_matrices(A, B)
+        Y_hat = A.dot(B.T)
+        self.results['Y_hat'] = Y_hat
 
         # Final info
         self.final = {}
@@ -136,7 +145,11 @@ class NMF_HALS(NMF):
             norm_value = np.sqrt(np.sum(A[:, jj] * A[:, jj]))
             A[:, jj] = A[:, jj] / norm_value
 
-        return A, B
+        # Calculate error
+        Y_hat = A.dot(B.T)
+        error = 0.5 * np.linalg.norm(Y-Y_hat, ord='fro')
+
+        return A, B, error
 
     class NMF_MU(NMF):
         """
@@ -160,9 +173,14 @@ class NMF_HALS(NMF):
                 numerator = A * YB
                 denominator = A.dot(B.T.dot(B)) + self.eps
                 A = numerator / denominator
+
+                # Calculate error
+                Y_hat = A.dot(B.T)
+                error = 0.5 * np.linalg.norm(Y-Y_hat, ord='fro')
+
             else:
                 print "Not a valid cost function."
                 print "Try: 'frobenius'."
                 sys.exit()
 
-            return A, B
+            return A, B, error
