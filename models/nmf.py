@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 
 import json
@@ -16,6 +17,7 @@ class NMF(object):
     def run(self, Y, j,
             init=None,
             max_iter=self.default_max_iter,
+            cost_function='frobenius',
             verbose=True):
         """
         Run a particular NMF algorithm.
@@ -28,6 +30,9 @@ class NMF(object):
             optionals:
             init:
             max_iter:
+            cost_function (str): name of cost function used in the iteration process.
+                                 Possible values are: 'frobenius', 'kullback-leibler',
+                                 'itakura-saito'.
             verbose:
 
         Returns:
@@ -40,6 +45,7 @@ class NMF(object):
                      'A_dim_2:' A.shape[1],
                      'A_type': str(A.__class__),
                      'max_iter': max_iter,
+                     'cost_function': cost_function,
                      'verbose': verbose}
 
         # Initialization of factor matrices
@@ -91,7 +97,6 @@ class NMF_HALS(NMF):
     Improved and modified HALS NMF algorithm called:
     FAST HALS for Large Scale NMF
     """
-
     def __init__(self, default_max_iter=100):
         self.eps = 1e-16
 
@@ -105,6 +110,11 @@ class NMF_HALS(NMF):
     def iter_solver(self, Y, A, B, j, it):
         """
         """
+        if cost_function != 'frobenius':
+            print "Cost function not valid for HALS algorithm."
+            print "Try: 'frobenius'."
+            sys.exit()
+
         # Update B
         W = Y.T.dot(A)
         V = A.T.dot(A)
@@ -124,3 +134,32 @@ class NMF_HALS(NMF):
             A[:, jj] = A[:, jj] / norm_value
 
         return A, B
+
+    class NMF_MU(NMF):
+        """
+        NMF algorithm: Multiplicative Updating
+        """
+        def __init__(self, default_max_iter=100):
+            self.eps = 1e-16
+
+        def iter_solver(self, Y, A, B, j, it):
+            """
+            """
+            if cost_function == 'frobenius':
+                # Update B
+                YtA = Y.T.dot(A)
+                numerator = B * YtA
+                denominator = B.dot(A.T.dot(A)) + self.eps
+                B = numerator / denominator
+
+                # Update A
+                YB = Y.dot(B)
+                numerator = A * YB
+                denominator = A.dot(B.T.dot(B)) + self.eps
+                A = numerator / denominator
+            else:
+                print "Not a valid cost function."
+                print "Try: 'frobenius'."
+                sys.exit()
+
+            return A, B
