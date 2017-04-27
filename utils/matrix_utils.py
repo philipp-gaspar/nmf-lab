@@ -2,7 +2,8 @@ import numpy as np
 import scipy.sparse as sps
 import math
 
-__all__ = ['column_norm']
+__all__ = ['column_norm',
+           'scale_factor_matrices']
 
 def column_norm(X, by_norm='2'):
     """
