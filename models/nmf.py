@@ -178,6 +178,25 @@ class NMF_HALS(NMF):
                 Y_hat = A.dot(B.T)
                 error = 0.5 * np.linalg.norm(Y-Y_hat, ord='fro')
 
+            elif self.cost_function == 'kullback-leibler':
+                # Update A
+                numerator = A * (Y / (A.dot(B.T)).dot(B))
+                ones = np.ones(Y.shape[0], Y.shape[1])
+                denominator = np.maximum(ones.dot(B), self.eps)
+                A = numerator / denominator
+
+                # Update B
+                X = B.T # to keep with the original form
+                AX = A.dot(X)
+                numerator = X * (A.T.dot(Y / AX))
+                denominator = np.maximum(A.T.dot(ones), self.eps)
+                X = numerator / denominator
+                B = X.T
+
+                # Calculate error
+                Y_hat = A.dot(B.T)
+                error = 0.0 # EDIT TO-DO!!!
+
             else:
                 print "Not a valid cost function."
                 print "Try: 'frobenius'."
