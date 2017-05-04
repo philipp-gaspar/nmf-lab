@@ -182,7 +182,7 @@ class NMF_HALS(NMF):
                 # Update A
                 numerator = A * (Y / (A.dot(B.T)).dot(B))
                 ones = np.ones(Y.shape[0], Y.shape[1])
-                denominator = np.maximum(ones.dot(B), self.eps)
+                denominator = ones.dot(B)
                 A = numerator / denominator
 
                 # Update B
