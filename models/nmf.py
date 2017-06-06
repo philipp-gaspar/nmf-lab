@@ -24,18 +24,17 @@ class NMF(object):
         """
         Run a particular NMF algorithm.
 
-        Arguments:
-        ---------
-            Y (numpy.array): data matrix, shape (i, t)
-            j (int): target lower rank
+        Args:
+        ----
+        Y (numpy.array): data matrix, shape (i, t)
+        j (int): target lower rank
 
-            optionals:
-            init:
-            max_iter:
-            cost_function (str): name of cost function used in the iteration process.
-                                 Possible values are: 'frobenius', 'kullback-leibler',
-                                 'itakura-saito'.
-            verbose:
+        optionals:
+        init (list): list with inital A and B matrices
+        max_iter (int): maximum number of iterations
+        cost_function (str): name of cost function used in the iteration process.
+        Possible values are: 'frobenius', 'kullback-leibler', 'itakura-saito'.
+        verbose (boolean): verbose variable
 
         Returns:
         -------
@@ -108,6 +107,9 @@ class NMF_HALS(NMF):
 
     Improved and modified HALS NMF algorithm called:
     FAST HALS for Large Scale NMF
+
+    Pseudo-Code in the book: Nonnegative Matrix and Tensor Factorizations
+    by A. Cichocki et All; Page 219; Algorithm 4.3
     """
     def __init__(self, default_max_iter=100):
         self.eps = 1e-16
@@ -120,8 +122,8 @@ class NMF_HALS(NMF):
         return A, B
 
     def iter_solver(self, Y, A, B, j, it):
-        """
-        """
+        # Check the cost function. FAST HALS algorithm only
+        # accepts Frobenius.
         if self.cost_function != 'frobenius':
             print "Cost function not valid for HALS algorithm."
             print "Try: 'frobenius'."
