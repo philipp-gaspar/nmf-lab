@@ -20,7 +20,7 @@ class NMF(object):
             init=None,
             max_iter=default_max_iter,
             cost_function='frobenius',
-            verbose=True):
+            verbose=False):
         """
         Run a particular NMF algorithm.
 
@@ -65,28 +65,30 @@ class NMF(object):
             print json.dumps(self.info, indent=4, sort_keys=True)
 
         start = time.time()
+
         # Algorithm specific initialization
         A, B = self.initializer(A, B)
 
         # Dictionary to save the results for each iteration
         self.results = {'cost_function': self.cost_function,
+                        'n_components': j,
                         'iter': [],
-                        'rel_error': []}
+                        'error': []}
 
         # Iteration Process
         for i in range(1, self.info['max_iter'] + 1):
             A, B, rel_error = self.iter_solver(Y, A, B, j, i)
             self.results['iter'].append(i)
-            self.results['rel_error'].append(rel_error)
+            self.results['error'].append(rel_error)
 
         # Normalize matrices A and B in order to not
         # modify the product A.dot(B.T)
         A, B = scale_factor_matrices(A, B)
         Y_hat = A.dot(B.T)
+
         self.results['Y_hat'] = Y_hat
         self.results['A'] = A
         self.results['B'] = B
-        self.results['componenst'] = j
 
         # Final info
         self.final = {}
@@ -96,7 +98,37 @@ class NMF(object):
             print "[NMF] Completed:"
             print json.dumps(self.final, indent=4, sort_keys=True)
 
-        return A, B
+        return self.results
+
+    def run_repeat(self, Y, j, num_trials,
+                   max_iter=default_max_iter,
+                   cost_function='frobenius',
+                   verbose=True):
+        """
+        Run an NMF algorithms several times with random
+        initial values and return the best results in terms
+        of the error function choosen.
+        """
+        for trial in range(num_trials):
+            if verbose:
+                print '[NMF] Running the %i/%i-th trial' % (trial+1, num_trials)
+
+            actual_model = self.run(Y, j,
+                                    init=None,
+                                    max_iter=max_iter,
+                                    cost_function=cost_function,
+                                    verbose=False)
+
+            if trial == 0:
+                best_model = actual_model
+            else:
+                if actual_model['error'][-1] < best_model['error'][-1]:
+                    best_model = actual_model
+
+        if verbose:
+            print '\n[NMF] Best result is: %1.3f' % best_model['error'][-1]
+
+        return best_model
 
     def iter_solver(self, Y, A, B, j, it):
         raise NotImplementedError
