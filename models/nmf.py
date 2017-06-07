@@ -4,7 +4,7 @@ import numpy as np
 import json
 import time
 
-from utils.matrix_utils import column_norm, scale_factor_matrices
+from ..utils.matrix_utils import column_norm, scale_factor_matrices
 
 class NMF(object):
     """
@@ -84,6 +84,9 @@ class NMF(object):
         A, B = scale_factor_matrices(A, B)
         Y_hat = A.dot(B.T)
         self.results['Y_hat'] = Y_hat
+        self.results['A'] = A
+        self.results['B'] = B
+        self.results['componenst'] = j
 
         # Final info
         self.final = {}
