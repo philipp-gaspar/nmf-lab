@@ -4,6 +4,8 @@ import numpy as np
 import json
 import time
 
+from tqdm import tqdm
+
 from ..utils.matrix_utils import column_norm, scale_factor_matrices
 
 class NMF(object):
@@ -38,8 +40,9 @@ class NMF(object):
 
         Returns:
         -------
-        A: factor matrix, shape (i, j)
-        B: coefficient matrix, shape (t, j)
+        results (dict): Dictionary with the results from the algorithm:
+            A: factor matrix, shape (i, j)
+            B: coefficient matrix, shape (t, j)
         """
         self.cost_function = cost_function
         self.info = {'j': j,
@@ -77,9 +80,9 @@ class NMF(object):
 
         # Iteration Process
         for i in range(1, self.info['max_iter'] + 1):
-            A, B, rel_error = self.iter_solver(Y, A, B, j, i)
+            A, B, error = self.iter_solver(Y, A, B, j, i)
             self.results['iter'].append(i)
-            self.results['error'].append(rel_error)
+            self.results['error'].append(error)
 
         # Normalize matrices A and B in order to not
         # modify the product A.dot(B.T)
@@ -109,9 +112,9 @@ class NMF(object):
         initial values and return the best results in terms
         of the error function choosen.
         """
-        for trial in range(num_trials):
-            if verbose:
-                print '[NMF] Running the %i/%i-th trial' % (trial+1, num_trials)
+        print '[NMF] Running %i random trials.' % (num_trials)
+
+        for trial in tqdm(range(num_trials), ncols=100):
 
             actual_model = self.run(Y, j,
                                     init=None,
@@ -126,7 +129,7 @@ class NMF(object):
                     best_model = actual_model
 
         if verbose:
-            print '\n[NMF] Best result is: %1.3f' % best_model['error'][-1]
+            print '[NMF] Best result has error = %1.3f' % best_model['error'][-1]
 
         return best_model
 
