@@ -194,13 +194,28 @@ class NMF_HALS(NMF):
     class NMF_MU(NMF):
         """
         NMF algorithm: Multiplicative Updating
+
+        Three possible cost functions:
+            - frobenius
+            - kullback-leibler
+            - itakura-saito
+
+        Update rules in matrix notation in the paper:
+        Multiplicative Update Rules for Nonnegative Matrix Factorization
+        with Co-occurrence Constraints by Steven K. Tjoa and K. J. Ray Liu
         """
         def __init__(self, default_max_iter=100):
             self.eps = 1e-16
 
+        def initializer(self, A, B):
+            # Normalize columns of matrix A to l2 unity norm
+            norm_vec = column_norm(A, by_norm='2')
+            A = A / norm_vec[None, :]
+
+            return A, B
+
         def iter_solver(self, Y, A, B, j, it):
-            """
-            """
+            # FROBENIUS
             if self.cost_function == 'frobenius':
                 # Update B
                 YtA = Y.T.dot(A)
@@ -218,16 +233,18 @@ class NMF_HALS(NMF):
                 Y_hat = A.dot(B.T)
                 error = 0.5 * np.linalg.norm(Y-Y_hat, ord='fro')
 
+            # KULLBACK-LEIBLER
             elif self.cost_function == 'kullback-leibler':
-                # Update A
-                numerator = A * (Y / (A.dot(B.T)).dot(B))
+                X = B.T # to keep with the original form
                 ones = np.ones(Y.shape[0], Y.shape[1])
-                denominator = ones.dot(B)
+                AX = A.dot(X) # reconstruction
+
+                # Update A
+                numerator = A * ((Y / AX).dot(X.T))
+                denominator = np.maximum(ones.dot(X.T), self.eps)
                 A = numerator / denominator
 
                 # Update B
-                X = B.T # to keep with the original form
-                AX = A.dot(X)
                 numerator = X * (A.T.dot(Y / AX))
                 denominator = np.maximum(A.T.dot(ones), self.eps)
                 X = numerator / denominator
@@ -235,11 +252,32 @@ class NMF_HALS(NMF):
 
                 # Calculate error
                 Y_hat = A.dot(B.T)
-                error = 0.0 # EDIT TO-DO!!!
+                error = ((Y * np.log((Y/Y_hat) + self.eps)) - Y + Y_hat).sum(axis=None)
+
+            elif self.cost_function == 'itakura-saito':
+                # ITAKURA-SAITO
+                X = B.T # to keep the original form
+                ones = np.ones(Y.shape[0], Y.shape[1])
+                AX = A.dot(X) # reconstruction
+
+                # Upadate A
+                numerator = A * (Y/np.power(AX, 2)).dot(X.T)
+                denominator = (ones / AX).dot(X.T)
+                A = numerator / denominator
+
+                # Update B
+                numerator = X * (A.T.dot(Y/np.power(AX, 2)))
+                denominator = A.T.dot(ones / AX)
+                X = numerator / denominator
+                B = X.T
+
+                # Calculate error
+                Y_hat = A.dot(B.T)
+                error = ((Y/(Y_hat + self.eps)) - np.log((Y/Y_hat + self.eps)+self.eps) - 1).sum(axis=None)
 
             else:
                 print "Not a valid cost function."
-                print "Try: 'frobenius'."
+                print "Try: 'frobenius', 'kullback-leibler' or 'itakura-saito'."
                 sys.exit()
 
             return A, B, error
