@@ -59,9 +59,13 @@ class NMF(object):
             B = init[1].copy()
             self.info['init'] = 'user_provided'
         else:
-            A = np.random.rand(Y.shape[0], j)
-            B = np.random.rand(Y.shape[1], j)
-            self.info['init'] = 'uniform_random'
+            # non-negative random matries like used scaled
+            # with sqrt(Y.mean() / n_components)
+            # same strategy used in the NMF package in Sklearn
+            avg = np.sqrt(Y.mean() / j)
+            A = np.abs(avg * np.random.randn(Y.shape[0], j))
+            B = np.abs(avg * np.random.randn(Y.shape[1], j))
+            self.info['init'] = 'random'
 
         if verbose:
             print "[NMF] Running: "
