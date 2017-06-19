@@ -87,7 +87,6 @@ class NMF(object):
             A, B, error = self.iter_solver(Y, A, B, j, i)
             self.results['iter'].append(i)
             self.results['error'].append(error)
-            print 'error: %1.4f' % (error)
 
         # Normalize matrices A and B in order to not
         # modify the product A.dot(B.T)
@@ -222,17 +221,21 @@ class NMF_MU(NMF):
     def iter_solver(self, Y, A, B, j, it):
         # FROBENIUS
         if self.cost_function == 'frobenius':
-            # Update B
-            YtA = Y.T.dot(A)
-            numerator = B * YtA
-            denominator = B.dot(A.T.dot(A)) + self.eps
-            B = numerator / denominator
-
             # Update A
             YB = Y.dot(B)
             numerator = A * YB
             denominator = A.dot(B.T.dot(B)) + self.eps
             A = numerator / denominator
+
+            # normalize columns of A
+            norm_vec = column_norm(A, by_norm='1')
+            A = A / norm_vec[None, :]
+
+            # Update B
+            YtA = Y.T.dot(A)
+            numerator = B * YtA
+            denominator = B.dot(A.T.dot(A)) + self.eps
+            B = numerator / denominator
 
             # Calculate error
             Y_hat = A.dot(B.T)
@@ -252,7 +255,6 @@ class NMF_MU(NMF):
             # normalize columns of A
             norm_vec = column_norm(A, by_norm='1')
             A = A / norm_vec[None, :]
-            print np.sum(A, axis=0)
 
             # update reconstruction
             AX = A.dot(X) + self.eps
@@ -271,12 +273,19 @@ class NMF_MU(NMF):
         elif self.cost_function == 'itakura-saito':
             X = B.T # to keep the original form
             ones = np.ones([Y.shape[0], Y.shape[1]])
-            AX = A.dot(X) # reconstruction
+            AX = A.dot(X) + self.eps # reconstruction
 
             # Upadate A
             numerator = A * (Y/np.power(AX, 2)).dot(X.T)
             denominator = (ones / AX).dot(X.T)
             A = numerator / denominator
+
+            # normalize columns of A
+            norm_vec = column_norm(A, by_norm='1')
+            A = A / norm_vec[None, :]
+
+            # update reconstruction
+            AX = A.dot(X) + self.eps
 
             # Update B
             numerator = X * (A.T.dot(Y/np.power(AX, 2)))
@@ -285,7 +294,7 @@ class NMF_MU(NMF):
             B = X.T
 
             # Calculate error
-            Y_hat = A.dot(B.T)
+            Y_hat = A.dot(B.T) + self.eps
             error = ((Y/(Y_hat + self.eps)) - np.log((Y/Y_hat + self.eps)+self.eps) - 1).sum(axis=None)
 
         else:
