@@ -87,10 +87,11 @@ class NMF(object):
             A, B, error = self.iter_solver(Y, A, B, j, i)
             self.results['iter'].append(i)
             self.results['error'].append(error)
+            print 'error: %1.4f' % (error)
 
         # Normalize matrices A and B in order to not
         # modify the product A.dot(B.T)
-        A, B = scale_factor_matrices(A, B)
+        A, B = scale_factor_matrices(A, B, by_norm='1')
         Y_hat = A.dot(B.T)
 
         self.results['Y_hat'] = Y_hat
@@ -195,93 +196,101 @@ class NMF_HALS(NMF):
 
         return A, B, error
 
-    class NMF_MU(NMF):
-        """
-        NMF algorithm: Multiplicative Updating
+class NMF_MU(NMF):
+    """
+    NMF algorithm: Multiplicative Updating
 
-        Three possible cost functions:
-            - frobenius
-            - kullback-leibler
-            - itakura-saito
+    Three possible cost functions:
+        - frobenius
+        - kullback-leibler
+        - itakura-saito
 
-        Update rules in matrix notation in the paper:
-        Multiplicative Update Rules for Nonnegative Matrix Factorization
-        with Co-occurrence Constraints by Steven K. Tjoa and K. J. Ray Liu
-        """
-        def __init__(self, default_max_iter=100):
-            self.eps = 1e-16
+    Update rules in matrix notation in the paper:
+    Multiplicative Update Rules for Nonnegative Matrix Factorization
+    with Co-occurrence Constraints by Steven K. Tjoa and K. J. Ray Liu
+    """
+    def __init__(self, default_max_iter=100):
+        self.eps = 1e-16
 
-        def initializer(self, A, B):
-            # Normalize columns of matrix A to l2 unity norm
-            norm_vec = column_norm(A, by_norm='2')
+    def initializer(self, A, B):
+        # Normalize columns of matrix A to l1 unity norm
+        norm_vec = column_norm(A, by_norm='1')
+        A = A / norm_vec[None, :]
+
+        return A, B
+
+    def iter_solver(self, Y, A, B, j, it):
+        # FROBENIUS
+        if self.cost_function == 'frobenius':
+            # Update B
+            YtA = Y.T.dot(A)
+            numerator = B * YtA
+            denominator = B.dot(A.T.dot(A)) + self.eps
+            B = numerator / denominator
+
+            # Update A
+            YB = Y.dot(B)
+            numerator = A * YB
+            denominator = A.dot(B.T.dot(B)) + self.eps
+            A = numerator / denominator
+
+            # Calculate error
+            Y_hat = A.dot(B.T)
+            error = 0.5 * np.linalg.norm(Y-Y_hat, ord='fro')
+
+        # KULLBACK-LEIBLER
+        elif self.cost_function == 'kullback-leibler':
+            X = B.T # to keep with the original form
+            ones = np.ones([Y.shape[0], Y.shape[1]])
+            AX = A.dot(X) + self.eps # initial reconstruction
+
+            # Update A
+            numerator = A * ((Y / AX).dot(X.T))
+            denominator = np.maximum(ones.dot(X.T), self.eps)
+            A = numerator / denominator
+
+            # normalize columns of A
+            norm_vec = column_norm(A, by_norm='1')
             A = A / norm_vec[None, :]
+            print np.sum(A, axis=0)
 
-            return A, B
+            # update reconstruction
+            AX = A.dot(X) + self.eps
 
-        def iter_solver(self, Y, A, B, j, it):
-            # FROBENIUS
-            if self.cost_function == 'frobenius':
-                # Update B
-                YtA = Y.T.dot(A)
-                numerator = B * YtA
-                denominator = B.dot(A.T.dot(A)) + self.eps
-                B = numerator / denominator
+            # Update B
+            numerator = X * (A.T.dot(Y / AX))
+            denominator = np.maximum(A.T.dot(ones), self.eps)
+            X = numerator / denominator
+            B = X.T
 
-                # Update A
-                YB = Y.dot(B)
-                numerator = A * YB
-                denominator = A.dot(B.T.dot(B)) + self.eps
-                A = numerator / denominator
+            # Calculate error
+            Y_hat = A.dot(B.T) + self.eps
+            error = ((Y * np.log((Y/Y_hat) + self.eps)) - Y + Y_hat).sum(axis=None)
 
-                # Calculate error
-                Y_hat = A.dot(B.T)
-                error = 0.5 * np.linalg.norm(Y-Y_hat, ord='fro')
+        # ITAKURA-SAITO
+        elif self.cost_function == 'itakura-saito':
+            X = B.T # to keep the original form
+            ones = np.ones([Y.shape[0], Y.shape[1]])
+            AX = A.dot(X) # reconstruction
 
-            # KULLBACK-LEIBLER
-            elif self.cost_function == 'kullback-leibler':
-                X = B.T # to keep with the original form
-                ones = np.ones(Y.shape[0], Y.shape[1])
-                AX = A.dot(X) # reconstruction
+            # Upadate A
+            numerator = A * (Y/np.power(AX, 2)).dot(X.T)
+            denominator = (ones / AX).dot(X.T)
+            A = numerator / denominator
 
-                # Update A
-                numerator = A * ((Y / AX).dot(X.T))
-                denominator = np.maximum(ones.dot(X.T), self.eps)
-                A = numerator / denominator
+            # Update B
+            numerator = X * (A.T.dot(Y/np.power(AX, 2)))
+            denominator = A.T.dot(ones / AX)
+            X = numerator / denominator
+            B = X.T
 
-                # Update B
-                numerator = X * (A.T.dot(Y / AX))
-                denominator = np.maximum(A.T.dot(ones), self.eps)
-                X = numerator / denominator
-                B = X.T
+            # Calculate error
+            Y_hat = A.dot(B.T)
+            error = ((Y/(Y_hat + self.eps)) - np.log((Y/Y_hat + self.eps)+self.eps) - 1).sum(axis=None)
 
-                # Calculate error
-                Y_hat = A.dot(B.T)
-                error = ((Y * np.log((Y/Y_hat) + self.eps)) - Y + Y_hat).sum(axis=None)
+        else:
+            print "Not a valid cost function."
+            print "Try: 'frobenius', 'kullback-leibler' or 'itakura-saito'."
+            sys.exit()
 
-            elif self.cost_function == 'itakura-saito':
-                # ITAKURA-SAITO
-                X = B.T # to keep the original form
-                ones = np.ones(Y.shape[0], Y.shape[1])
-                AX = A.dot(X) # reconstruction
-
-                # Upadate A
-                numerator = A * (Y/np.power(AX, 2)).dot(X.T)
-                denominator = (ones / AX).dot(X.T)
-                A = numerator / denominator
-
-                # Update B
-                numerator = X * (A.T.dot(Y/np.power(AX, 2)))
-                denominator = A.T.dot(ones / AX)
-                X = numerator / denominator
-                B = X.T
-
-                # Calculate error
-                Y_hat = A.dot(B.T)
-                error = ((Y/(Y_hat + self.eps)) - np.log((Y/Y_hat + self.eps)+self.eps) - 1).sum(axis=None)
-
-            else:
-                print "Not a valid cost function."
-                print "Try: 'frobenius', 'kullback-leibler' or 'itakura-saito'."
-                sys.exit()
-
-            return A, B, error
+        return A, B, error
