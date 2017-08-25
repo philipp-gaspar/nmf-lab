@@ -4,8 +4,6 @@ import numpy as np
 import json
 import time
 
-from tqdm import tqdm
-
 from ..utils.matrix_utils import column_norm, scale_factor_matrices
 
 class NMF(object):
@@ -110,15 +108,16 @@ class NMF(object):
     def run_repeat(self, Y, j, num_trials,
                    max_iter=default_max_iter,
                    cost_function='frobenius',
-                   verbose=True):
+                   verbose=False):
         """
         Run an NMF algorithms several times with random
         initial values and return the best results in terms
         of the error function choosen.
         """
-        print '[NMF] Running %i random trials.' % (num_trials)
+        if verbose:
+            print '[NMF] Running %i random trials.' % (num_trials)
 
-        for trial in tqdm(range(num_trials), ncols=100):
+        for trial in range(num_trials):
 
             actual_model = self.run(Y, j,
                                     init=None,
