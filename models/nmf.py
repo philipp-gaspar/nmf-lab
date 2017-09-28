@@ -24,23 +24,34 @@ class NMF(object):
         """
         Run a particular NMF algorithm.
 
-        Args:
-        ----
-        Y (numpy.array): data matrix, shape (i, t)
-        j (int): target lower rank
+        Parameters
+        ----------
+        Y : numpy.array
+            Data matrix, shape (i, t).
+        j : int
+            Target lower rank.
 
-        optionals:
-        init (list): list with inital A and B matrices
-        max_iter (int): maximum number of iterations
-        cost_function (str): name of cost function used in the iteration process.
-        Possible values are: 'frobenius', 'kullback-leibler', 'itakura-saito'.
-        verbose (boolean): verbose variable
+        Optionals
+        ---------
+        init : list
+            List with inital A and B matrices.
+        max_iter : int
+            Maximum number of iterations.
+        cost_function : str
+            Name of cost function used in the iteration process.
+            Possible values are:
+                - 'frobenius'
+                - 'kullback-leibler'
+                - 'itakura-saito'
+        verbose : boolean
+            Verbose variable.
 
-        Returns:
+        Returns
         -------
-        results (dict): Dictionary with the results from the algorithm:
-            A: factor matrix, shape (i, j)
-            B: coefficient matrix, shape (t, j)
+        results : dict
+            Dictionary with the results from the algorithm:
+                A - factor matrix, shape (i, j)
+                B - coefficient matrix, shape (t, j)
         """
         self.cost_function = cost_function
         self.info = {'j': j,
@@ -149,8 +160,8 @@ class NMF_HALS(NMF):
     Improved and modified HALS NMF algorithm called:
     FAST HALS for Large Scale NMF
 
-    Pseudo-Code in the book: Nonnegative Matrix and Tensor Factorizations
-    by A. Cichocki et All; Page 219; Algorithm 4.3
+    REF [1]: Pseudo-Code in the book: Nonnegative Matrix and Tensor
+    Factorizations by A. Cichocki et All; Page 219; Algorithm 4.3
     """
     def __init__(self, default_max_iter=100):
         self.eps = 1e-16
@@ -203,8 +214,7 @@ class NMF_MU(NMF):
         - kullback-leibler
         - itakura-saito
 
-    Update rules in matrix notation in the paper:
-    Multiplicative Update Rules for Nonnegative Matrix Factorization
+    REF [1]: Multiplicative Update Rules for Nonnegative Matrix Factorization
     with Co-occurrence Constraints by Steven K. Tjoa and K. J. Ray Liu
     """
     def __init__(self, default_max_iter=100):
