@@ -343,65 +343,63 @@ class NMF_MU(NMF):
 
         return W, H, error
 
-# class LOCAL_NMF(NMF):
-#     """
-#     Local Non-Negative Matrix Factorization (LNMF)
-#
-#     This NMF algorithmm is aimed to learn spatially localized, parts-based
-#     subspace representations of visual patterns.
-#     An objective fuction (Kullback-Leibler) localization constrain, in addition
-#     to the non-negativity constrain in the standard NMF.
-#
-#     REF [1]: Learning Spatially Localized, Parts-Based Representations -
-#     S. Z. Li, X. Hou, H. Zhang and Q. Cheng - (2001).
-#
-#     NOTE
-#     ----
-#     Even though the stated objective function has weights alpha and
-#     beta, these disappear in the simplifications made by the authors when
-#     deriving the updates. Therefore, we report the regular Kullback-Leibler
-#     divergence as the error here.
-#     """
-#     def __init__(self, default_max_iter=100):
-#         self.eps = 1e-16
-#
-#     def initializer(self, A, B):
-#         # Normalize columns of matrix A to l1 unity norm
-#         norm_vec = column_norm(A, by_norm='1')
-#         A = A / norm_vec[None, :]
-#
-#         return A, B
-#
-#     def iter_solver(self, Y, A, B, j, it):
-#         # Check the cost function. LNMF only accepts Kullback-Leibler.
-#         if self.cost_function != 'kullback-leibler':
-#             print("Cost function not valid for LNMF algorithm.")
-#             print("Try: 'kullback-leibler'.")
-#             sys.exit()
-#
-#         X = B.T # to keep with the original form
-#         ones = np.ones([Y.shape[0], Y.shape[1]])
-#         AX = A.dot(X) + self.eps # initial reconstruction
-#
-#         # Update A
-#         numerator = A * ((Y / AX).dot(X.T))
-#         denominator = np.maximum(ones.dot(X.T), self.eps)
-#         A = numerator / denominator
-#
-#         # normalize columns of A
-#         norm_vec = column_norm(A, by_norm='1')
-#         A = A / norm_vec[None, :]
-#
-#         # update reconstruction
-#         AX = A.dot(X) + self.eps
-#
-#         # Update B
-#         AX = np.maximum(AX, self.eps)
-#         X = np.sqrt(X * (A.T.dot(Y / AX)))
-#         B = X.T
-#
-#         # Calculate error
-#         Y_hat = A.dot(B.T) + self.eps
-#         error = ((Y * np.log((Y/Y_hat) + self.eps)) - Y + Y_hat).sum(axis=None)
-#
-#         return A, B, error
+class LOCAL_NMF(NMF):
+    """
+    Local Non-Negative Matrix Factorization (LNMF)
+
+    This NMF algorithmm is aimed to learn spatially localized, parts-based
+    subspace representations of visual patterns.
+    An objective fuction (Kullback-Leibler) localization constrain, in addition
+    to the non-negativity constrain in the standard NMF.
+
+    REF [1]: Learning Spatially Localized, Parts-Based Representations -
+    S. Z. Li, X. Hou, H. Zhang and Q. Cheng - (2001).
+
+    NOTE
+    ----
+    Even though the stated objective function has weights alpha and
+    beta, these disappear in the simplifications made by the authors when
+    deriving the updates. Therefore, we report the regular Kullback-Leibler
+    divergence as the error here.
+    """
+    def __init__(self, default_max_iter=100):
+        self.eps = 1e-16
+
+    def initializer(self, W, H):
+        # Normalize columns of matrix W to l1 unity norm
+        norm_vec = column_norm(W, by_norm='1')
+        W = W / norm_vec[None, :]
+
+        return W, H
+
+    def iter_solver(self, V, W, H, r, it):
+        # Check the cost function. LNMF only accepts Kullback-Leibler.
+        if self.cost_function != 'kullback-leibler':
+            print("Cost function not valid for LNMF algorithm.")
+            print("Try: 'kullback-leibler'.")
+            sys.exit()
+
+        ones = np.ones([V.shape[0], V.shape[1]])
+        WH = W.dot(H) # initial reconstruction
+
+        # Update W
+        numerator = W * ((V / WH).dot(H.T))
+        denominator = np.maximum(ones.dot(H.T), self.eps)
+        W = numerator / denominator
+
+        # normalize columns of W
+        norm_vec = column_norm(W, by_norm='1')
+        W = W / norm_vec[None, :]
+
+        # update reconstruction
+        WH = W.dot(H)
+
+        # Update H
+        WH = np.maximum(WH, self.eps)
+        H = np.sqrt(H * (W.T.dot(V / WH)))
+
+        # Calculate error
+        V_hat = W.dot(H)
+        error = kullback_leibler_divergence(V, V_hat)
+
+        return W, H, error
