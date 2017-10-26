@@ -189,57 +189,59 @@ class NMF(object):
     def initializer(self, W, H):
         return W, H
 
-# class NMF_HALS(NMF):
-#     """
-#     NMF algorithm: Hierarchical Alternating Least Squares
-#
-#     Improved and modified HALS NMF algorithm called:
-#     FAST HALS for Large Scale NMF
-#
-#     REF [1]: Pseudo-Code in the book: Nonnegative Matrix and Tensor
-#     Factorizations - A. Cichocki et All; Page 219; Algorithm 4.3
-#     """
-#     def __init__(self, default_max_iter=100):
-#         self.eps = 1e-16
-#
-#     def initializer(self, A, B):
-#         # Normalize columns of matrix A to l2 unity norm
-#         norm_vec = column_norm(A, by_norm='2')
-#         A = A / norm_vec[None, :]
-#
-#         return A, B
-#
-#     def iter_solver(self, Y, A, B, j, it):
-#         # Check the cost function. FAST HALS algorithm only
-#         # accepts Frobenius.
-#         if self.cost_function != 'frobenius':
-#             print "Cost function not valid for HALS algorithm."
-#             print "Try: 'frobenius'."
-#             sys.exit()
-#
-#         # Update B
-#         W = Y.T.dot(A)
-#         V = A.T.dot(A)
-#
-#         for jj in range(j):
-#             b_jj = B[:, jj] + W[:, jj] - B.dot(V[:, jj])
-#             B[:, jj] = np.maximum(b_jj, self.eps)
-#
-#         # Update A
-#         P = Y.dot(B)
-#         Q = B.T.dot(B)
-#
-#         for jj in range(j):
-#             a_jj = A[:, jj] * Q[jj, jj] + P[:, jj] - A.dot(Q[:, jj])
-#             A[:, jj] = np.maximum(a_jj, self.eps)
-#             norm_value = np.sqrt(np.sum(A[:, jj] * A[:, jj]))
-#             A[:, jj] = A[:, jj] / norm_value
-#
-#         # Calculate error
-#         Y_hat = A.dot(B.T)
-#         error = 0.5 * np.linalg.norm(Y-Y_hat, ord='fro')
-#
-#         return A, B, error
+class NMF_HALS(NMF):
+    """
+    NMF algorithm: Hierarchical Alternating Least Squares
+
+    Improved and modified HALS NMF algorithm called:
+    FAST HALS for Large Scale NMF
+
+    REF [1]: Pseudo-Code in the book: Nonnegative Matrix and Tensor
+    Factorizations - A. Cichocki et All; Page 219; Algorithm 4.3
+    """
+    def __init__(self, default_max_iter=100):
+        self.eps = 1e-16
+
+    def initializer(self, W, H):
+        # Normalize columns of matrix W to l2 unity norm
+        norm_vec = column_norm(W, by_norm='2')
+        W = W / norm_vec[None, :]
+
+        return W, H
+
+    def iter_solver(self, V, W, H, r, it):
+        # Check the cost function. FAST HALS algorithm only
+        # accepts Frobenius.
+        if self.cost_function != 'frobenius':
+            print "Cost function not valid for HALS algorithm."
+            print "Try: 'frobenius'."
+            sys.exit()
+
+        # Update H
+        R = V.T.dot(W)
+        U = W.T.dot(W)
+
+        B = H.T # to operate on the columns of the matrix
+        for rr in range(r):
+            b_rr = B[:, rr] + R[:, rr] - B.dot(U[:, rr])
+            B[:, rr] = np.maximum(b_rr, self.eps)
+
+        # Update W
+        P = V.dot(B)
+        Q = B.T.dot(B)
+
+        for rr in range(r):
+            w_rr = W[:, rr] * Q[rr, rr] + P[:, rr] - W.dot(Q[:, rr])
+            W[:, rr] = np.maximum(w_rr, self.eps)
+            norm_value = np.sqrt(np.sum(W[:, rr] * W[:, rr]))
+            W[:, rr] = W[:, rr] / norm_value
+
+        # Calculate error
+        H = B.T # return to original notation
+        V_hat = W.dot(H)
+        error = frobenius_norm(V, V_hat)
+
+        return W, H, error
 
 class NMF_MU(NMF):
     """
