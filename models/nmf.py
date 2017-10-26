@@ -5,7 +5,7 @@ import json
 import time
 
 from ..utils.matrix_utils import column_norm, scale_factor_matrices
-from ..utils.metrics import frobenius_norm
+from ..utils.metrics import frobenius_norm, kullback_leibler_divergence
 
 class NMF(object):
     """
@@ -285,31 +285,29 @@ class NMF_MU(NMF):
 
         # KULLBACK-LEIBLER
         elif self.cost_function == 'kullback-leibler':
-            X = B.T # to keep with the original form
-            ones = np.ones([Y.shape[0], Y.shape[1]])
-            AX = A.dot(X) + self.eps # initial reconstruction
+            ones = np.ones([V.shape[0], V.shape[1]])\
+            WH = W.dot(H) # reconstruction
 
-            # Update A
-            numerator = A * ((Y / AX).dot(X.T))
-            denominator = np.maximum(ones.dot(X.T), self.eps)
-            A = numerator / denominator
+            # Update W
+            numerator = W * ((V / WH).dot(H.T))
+            denominator = np.maximum(ones.dot(H.T), self.eps)
+            W = numerator / denominator
 
-            # normalize columns of A
-            norm_vec = column_norm(A, by_norm='1')
-            A = A / norm_vec[None, :]
+            # normalize columns of W
+            norm_vec = column_norm(W, by_norm='1')
+            W = W / norm_vec[None, :]
 
             # update reconstruction
-            AX = A.dot(X) + self.eps
+            WH = W.dot(H)
 
-            # Update B
-            numerator = X * (A.T.dot(Y / AX))
-            denominator = np.maximum(A.T.dot(ones), self.eps)
-            X = numerator / denominator
-            B = X.T
+            # Update H
+            numerator = H * (W.T.dot(V / WH))
+            denominator = np.maximum(W.T.dot(ones), self.eps)
+            H = numerator / denominator
 
             # Calculate error
-            Y_hat = A.dot(B.T) + self.eps
-            error = ((Y * np.log((Y/Y_hat) + self.eps)) - Y + Y_hat).sum(axis=None)
+            V_hat = W.dot(H)
+            error = kullback_leibler_divergence(V, V_hat)
 
         # ITAKURA-SAITO
         elif self.cost_function == 'itakura-saito':
@@ -344,7 +342,7 @@ class NMF_MU(NMF):
             print "Try: 'frobenius', 'kullback-leibler' or 'itakura-saito'."
             sys.exit()
 
-        return A, B, error
+        return W, H, error
 
 # class LOCAL_NMF(NMF):
 #     """
