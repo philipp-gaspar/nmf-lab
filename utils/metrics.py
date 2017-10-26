@@ -37,8 +37,28 @@ def kullback_leibler_divergence(Y, Y_hat):
     Returns
     -------
     error : float
-        Calculated error using the Frobenius Norm.
+        Calculated error using the KL divergence.
     """
     error = ((Y * np.log((Y/Y_hat) + self.eps)) - Y + Y_hat).sum(axis=None)
+
+    return error
+
+def itakura_saito_divergence(Y, Y_hat):
+    """
+    Calculate the Itakura-Saito divergence between two matrices.
+
+    Parameters
+    ----------
+    Y : numpy.array
+        Original matrix.
+    Y_hat : numpy.array
+        Estimated matrix.
+
+    Returns
+    -------
+    error : float
+        Calculated error using the IS divergence.
+    """
+    error = ((Y/(Y_hat + self.eps)) - np.log((Y/Y_hat + self.eps)+self.eps) - 1).sum(axis=None)
 
     return error

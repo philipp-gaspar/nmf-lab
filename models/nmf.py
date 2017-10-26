@@ -5,7 +5,8 @@ import json
 import time
 
 from ..utils.matrix_utils import column_norm, scale_factor_matrices
-from ..utils.metrics import frobenius_norm, kullback_leibler_divergence
+from ..utils.metrics import frobenius_norm, kullback_leibler_divergence, \
+itakura_saito_divergence
 
 class NMF(object):
     """
@@ -311,31 +312,29 @@ class NMF_MU(NMF):
 
         # ITAKURA-SAITO
         elif self.cost_function == 'itakura-saito':
-            X = B.T # to keep the original form
-            ones = np.ones([Y.shape[0], Y.shape[1]])
-            AX = A.dot(X) + self.eps # reconstruction
+            ones = np.ones([V.shape[0], V.shape[1]])
+            WH = W.dot(H) # reconstruction
 
-            # Upadate A
-            numerator = A * (Y/np.power(AX, 2)).dot(X.T)
-            denominator = (ones / AX).dot(X.T)
-            A = numerator / denominator
+            # Upadate W
+            numerator = W * (V/np.power(WH, 2)).dot(H.T)
+            denominator = (ones / WH).dot(H.T)
+            W = numerator / denominator
 
-            # normalize columns of A
-            norm_vec = column_norm(A, by_norm='1')
-            A = A / norm_vec[None, :]
+            # normalize columns of W
+            norm_vec = column_norm(W, by_norm='1')
+            W = W / norm_vec[None, :]
 
             # update reconstruction
-            AX = A.dot(X) + self.eps
+            WH = W.dot(H)
 
-            # Update B
-            numerator = X * (A.T.dot(Y/np.power(AX, 2)))
-            denominator = A.T.dot(ones / AX)
-            X = numerator / denominator
-            B = X.T
+            # Update H
+            numerator = H * (W.T.dot(V/np.power(WH, 2)))
+            denominator = W.T.dot(ones / WH)
+            H = numerator / denominator
 
             # Calculate error
-            Y_hat = A.dot(B.T) + self.eps
-            error = ((Y/(Y_hat + self.eps)) - np.log((Y/Y_hat + self.eps)+self.eps) - 1).sum(axis=None)
+            V_hat = W.dot(H)
+            error = itakura_saito_divergence(V, V_hat)
 
         else:
             print "Not a valid cost function."
