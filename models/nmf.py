@@ -92,7 +92,7 @@ class NMF(object):
 
         # Dictionary to save the results for each iteration
         self.results = {'cost_function': self.cost_function,
-                        'n_components': j,
+                        'n_components': r,
                         'iter': [],
                         'error': []}
 
@@ -123,7 +123,7 @@ class NMF(object):
 
     def run_repeat(self, V, r, num_trials,
                    max_iter=default_max_iter,
-                   cost_function=self.cost_function,
+                   cost_function='frobenius',
                    verbose=False):
         """
         Run an NMF algorithm several times with random
@@ -290,7 +290,7 @@ class NMF_MU(NMF):
 
         # KULLBACK-LEIBLER
         elif self.cost_function == 'kullback-leibler':
-            ones = np.ones([V.shape[0], V.shape[1]])\
+            ones = np.ones([V.shape[0], V.shape[1]])
             WH = W.dot(H) # reconstruction
 
             # Update W
