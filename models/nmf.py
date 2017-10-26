@@ -233,6 +233,8 @@ class NMF_HALS(NMF):
         for rr in range(r):
             w_rr = W[:, rr] * Q[rr, rr] + P[:, rr] - W.dot(Q[:, rr])
             W[:, rr] = np.maximum(w_rr, self.eps)
+
+            # normalize columns of W
             norm_value = np.sqrt(np.sum(W[:, rr] * W[:, rr]))
             W[:, rr] = W[:, rr] / norm_value
 
