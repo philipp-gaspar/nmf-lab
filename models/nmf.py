@@ -172,8 +172,6 @@ class NMF(object):
                                     max_iter=max_iter,
                                     cost_function=cost_function,
                                     verbose=False)
-            print('Actual: %1.3f' % actual_model['error'][-1])
-
             if trial == 0:
                 best_model = actual_model
             else:
