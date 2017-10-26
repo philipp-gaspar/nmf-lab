@@ -1,8 +1,8 @@
 import numpy as np
 import scipy.sparse as sps
-import math
 
 __all__ = ['column_norm',
+           'row_norm',
            'scale_factor_matrices']
 
 def column_norm(X, by_norm='2'):
@@ -66,28 +66,28 @@ def row_norm(X, by_norm='2'):
             norm_vec = np.sum(X, axis=1)
         return norm_vec
 
-def scale_factor_matrices(A, B, by_norm='2'):
+def scale_factor_matrices(W, H, by_norm):
     """
     Column normalization of factor matrices.
 
-    Scale the columns of A and B so that the columns of A
-    have unit norms and the product A.dot(B.T) remains
+    Scale the columns of W and H so that the columns of W
+    have unit norms and the product W.dot(H) remains
     the same.
 
     Parameters
     ----------
-    A : numpy.array, shape (i, j)
-    B : numpy.array, shape (t, j)
+    W : numpy.array, shape (n, r)
+    H : numpy.array, shape (r, m)
     by_norm : string
         - '1' for l1-normalization
         - '2' for l2-normalization
 
     Returns
     -------
-    A, B : normalized matrix pair
+    W, H : normalized matrix pair
     """
-    norm_vec = column_norm(A, by_norm=by_norm)
-    A = A / norm_vec[None, :]
-    B = B * norm_vec[None, :]
+    norm_vec = column_norm(W, by_norm=by_norm)
+    W = W / norm_vec[None, :]
+    H = H * norm_vec[:, None]
 
-    return A, B
+    return W, H

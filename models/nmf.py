@@ -16,25 +16,28 @@ class NMF(object):
         # NMF is a Base class and cannot be instantiated
         raise NotImplementedError()
 
-    def run(self, Y, j,
+    def run(self, V, r,
             init=None,
             max_iter=default_max_iter,
             cost_function='frobenius',
             verbose=False):
         """
         Run a particular NMF algorithm.
+        NMF factorization go as: V = WH
 
         Parameters
         ----------
-        Y : numpy.array
-            Data matrix, shape (i, t).
-        j : int
-            Target lower rank.
+        V : numpy.array
+            Data matrix, shape (n, m).
+                - rows -> features
+                - columns -> measurements
+        r : int
+            Number of components.
 
         Optionals
         ---------
         init : list
-            List with inital A and B matrices.
+            List with inital W and H matrices.
         max_iter : int
             Maximum number of iterations.
         cost_function : str
@@ -50,31 +53,31 @@ class NMF(object):
         -------
         results : dict
             Dictionary with the results from the algorithm:
-                A - factor matrix, shape (i, j)
-                B - coefficient matrix, shape (t, j)
+                W - factor matrix, shape (n, r)
+                H - coefficient matrix, shape (r, m)
         """
         self.cost_function = cost_function
-        self.info = {'j': j,
-                     'Y_dim_1': Y.shape[0],
-                     'Y_dim_2': Y.shape[1],
-                     'Y_type': str(Y.__class__),
+        self.info = {'r': r,
+                     'V_dim_1': V.shape[0],
+                     'V_dim_2': V.shape[1],
+                     'V_type': str(V.__class__),
                      'max_iter': max_iter,
                      'cost_function': self.cost_function,
                      'verbose': verbose}
 
         # Initialization of factor matrices
         if init != None:
-            A = init[0].copy()
-            B = init[1].copy()
+            W = init[0].copy()
+            H = init[1].copy()
             self.info['init'] = 'user_provided'
         else:
-            # non-negative random matries like used scaled
-            # with sqrt(Y.mean() / n_components)
+            # non-negative random matrices scaled
+            # with sqrt(V.mean() / r)
             # same strategy used in the NMF package in Sklearn
-            avg = np.sqrt(Y.mean() / j)
-            A = np.abs(avg * np.random.randn(Y.shape[0], j))
-            B = np.abs(avg * np.random.randn(Y.shape[1], j))
-            self.info['init'] = 'random'
+            avg = np.sqrt(V.mean() / r)
+            W = np.abs(avg * np.random.randn(V.shape[0], r))
+            H = np.abs(avg * np.random.randn(r, V.shape[1]))
+            self.info['init'] = 'normally-random'
 
         if verbose:
             print "[NMF] Running: "
@@ -83,7 +86,7 @@ class NMF(object):
         start = time.time()
 
         # Algorithm specific initialization
-        A, B = self.initializer(A, B)
+        W, H = self.initializer(W, H)
 
         # Dictionary to save the results for each iteration
         self.results = {'cost_function': self.cost_function,
@@ -93,18 +96,18 @@ class NMF(object):
 
         # Iteration Process
         for i in range(1, self.info['max_iter'] + 1):
-            A, B, error = self.iter_solver(Y, A, B, j, i)
+            W, H, error = self.iter_solver(V, W, H, r, i)
             self.results['iter'].append(i)
             self.results['error'].append(error)
 
-        # Normalize matrices A and B in order to not
-        # modify the product A.dot(B.T)
-        A, B = scale_factor_matrices(A, B, by_norm='1')
-        Y_hat = A.dot(B.T)
+        # Normalize matrices W and H in order to not
+        # modify the product W.dot(H)
+        W, H = scale_factor_matrices(W, H, by_norm='1')
+        V_hat = W.dot(H)
 
-        self.results['Y_hat'] = Y_hat
-        self.results['A'] = A
-        self.results['B'] = B
+        self.results['V_hat'] = V_hat
+        self.results['W'] = W
+        self.results['H'] = H
 
         # Final info
         self.final = {}
@@ -116,21 +119,52 @@ class NMF(object):
 
         return self.results
 
-    def run_repeat(self, Y, j, num_trials,
+    def run_repeat(self, V, r, num_trials,
                    max_iter=default_max_iter,
-                   cost_function='frobenius',
+                   cost_function=self.cost_function,
                    verbose=False):
         """
         Run an NMF algorithm several times with random
         initial values and return the best results in terms
         of the error function choosen.
+
+        Parameters
+        ----------
+        V : numpy.array
+            Data matrix, shape (n, m).
+                - rows -> features
+                - columns -> measurements
+        r : int
+            Number of components.
+        num_trials : int
+            Number of different trials/initializations for the NMF algorithm.
+
+        Optionals
+        ---------
+        max_iter : int
+            Maximum number of iterations.
+        cost_function : str
+            Name of cost function used in the iteration process.
+            Possible values are:
+                - 'frobenius'
+                - 'kullback-leibler'
+                - 'itakura-saito
+        verbose : boolean
+            Verbose variable.
+
+        Returns
+        -------
+        best_model : dict
+            Dictionary with the results from the best model:
+                W - factor matrix, shape (n, r)
+                H - coefficient matrix, shape (r, m)
         """
         if verbose:
             print '[NMF] Running %i random trials.' % (num_trials)
 
         for trial in range(num_trials):
 
-            actual_model = self.run(Y, j,
+            actual_model = self.run(V, r,
                                     init=None,
                                     max_iter=max_iter,
                                     cost_function=cost_function,
@@ -147,11 +181,11 @@ class NMF(object):
 
         return best_model
 
-    def iter_solver(self, Y, A, B, j, it):
+    def iter_solver(self, V, W, H, r, it):
         raise NotImplementedError
 
-    def initializer(self, A, B):
-        return A, B
+    def initializer(self, W, H):
+        return W, H
 
 class NMF_HALS(NMF):
     """
