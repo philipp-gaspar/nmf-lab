@@ -96,6 +96,7 @@ class NMF(object):
                         'iter': [],
                         'error': []}
 
+
         # Iteration Process
         for i in range(1, self.info['max_iter'] + 1):
             W, H, error = self.iter_solver(V, W, H, r, i)
@@ -171,6 +172,7 @@ class NMF(object):
                                     max_iter=max_iter,
                                     cost_function=cost_function,
                                     verbose=False)
+            print('Actual: %1.3f' % actual_model['error'][-1])
 
             if trial == 0:
                 best_model = actual_model
@@ -267,7 +269,7 @@ class NMF_MU(NMF):
 
         return W, H
 
-    def iter_solver(self, Y, A, B, j, it):
+    def iter_solver(self, V, W, H, r, it):
         # FROBENIUS
         if self.cost_function == 'frobenius':
             # Update W

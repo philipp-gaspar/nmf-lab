@@ -1,27 +1,23 @@
-import sys
-
 import numpy as np
-
-# Setup analysis path
-analysis_path = '/home/philipp.gaspar/Software/nmf-lab/'
-sys.path.append(analysis_path)
 
 # Creating synthetic data
 
-rows = 100
-columns = 50
+rows = 50
+columns = 100
 
 print 'Generating synthetic data...\n'
-Y = np.random.rand(rows, columns)
+V = np.random.rand(rows, columns)
 
 
-from models.nmf import NMF_HALS
+from nmf_lab.models.nmf import NMF_MU
 
-nmf_hals = NMF_HALS()
+nmf_mu = NMF_MU()
 
-n_comp = 5
-nmf_hals.run(Y, n_comp,
-             init=None,
-             max_iter=500,
-             cost_function='frobenius',
-             verbose=True)
+n_comp = 20
+num_trials = 100
+results = nmf_mu.run_repeat(V, n_comp, num_trials,
+                              max_iter=500,
+                              cost_function='kullback-leibler',
+                              verbose=True)
+
+print(results.keys())

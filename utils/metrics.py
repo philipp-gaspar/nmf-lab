@@ -39,7 +39,8 @@ def kullback_leibler_divergence(Y, Y_hat):
     error : float
         Calculated error using the KL divergence.
     """
-    error = ((Y * np.log((Y/Y_hat) + self.eps)) - Y + Y_hat).sum(axis=None)
+    eps = 1e-16
+    error = ((Y * np.log((Y/Y_hat) + eps)) - Y + Y_hat).sum(axis=None)
 
     return error
 
@@ -59,6 +60,7 @@ def itakura_saito_divergence(Y, Y_hat):
     error : float
         Calculated error using the IS divergence.
     """
-    error = ((Y/(Y_hat + self.eps)) - np.log((Y/Y_hat + self.eps)+self.eps) - 1).sum(axis=None)
+    eps = 1e-16
+    error = ((Y/(Y_hat + eps)) - np.log((Y/Y_hat + eps) + eps) - 1).sum(axis=None)
 
     return error
