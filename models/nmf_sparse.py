@@ -3,7 +3,8 @@ import numpy as np
 
 import json
 import time
-from collections import namedtuple
+
+from ..utils.matrix_utils import column_norm, scale_factor_matrices
 
 class NMF_SPARSE(object):
     """
@@ -14,13 +15,30 @@ class NMF_SPARSE(object):
         # NMF_SPARSE is a Base class and cannot be instantiated
         raise NotImplementedError()
 
-    def run(self, V, r, alpha=0.0, init=None, max_iter=100, verbose=False):
+    def run(self, V, r, alpha, init=None, max_iter=100, verbose=False):
         """
         Run a particular Sparse NMF algorithm.
         NMF factorization go as: V = WH
 
         Parameters
         ----------
+        V : numpy.array
+            Data matrix, shape (n, m).
+                - rows -> features
+                - columns -> measurements
+        r : int
+            Nunber of components.
+        alpha : float
+            Sparseness parameter.
+
+        Optionals
+        ---------
+        init : list
+            List with initial W and H matrices.
+        max_iter : int
+            Maximum number of iterations.
+        verbose : boolean
+            Verbose variable.
 
         Returns
         -------
@@ -53,7 +71,6 @@ class NMF_SPARSE(object):
         start = time.time()
 
         # Algorithm specific initialization
-        # NEED CHANGE
         W, H = self.initializer(W, H)
 
         # Dictionary to save the results for each iteration
@@ -63,8 +80,7 @@ class NMF_SPARSE(object):
                         'error': [],
                         'sparse_error': [],
                         'total_error': [],
-                        'sparseness_W': [],
-                        'sparseness_H': []}
+                        'sparseness_W': []}
 
         # Iteration process
         for it in range(1, max_iter+1):
@@ -74,8 +90,9 @@ class NMF_SPARSE(object):
             self.results['sparse_error'].append(errors_dict['sparse_error'])
             self.results['total_error'].append(errors_dict['total_error'])
 
-            # NEED IMPLEMENTATION
-            # CALCULATE SPARSENESS ON W AND H
+            # CALCULATE SPARSENESS ON W
+            sparseness_W = self.sparseness_on_basis(W)
+            self.results['sparseness_W'].append(sparseness_W)
 
         # Normalize matrices W and H in order to not modify their product
         W, H = scale_factor_matrices(W, H, by_norm='1')
@@ -93,6 +110,40 @@ class NMF_SPARSE(object):
 
         return self.results
 
+    def sparseness_on_basis(self, W):
+        """
+        Define the sparseness of a matrix W based on the relationship
+        between the L1 and L2 norm [1].
+
+        Parameter
+        ----------
+        W : numpy.array
+            Basis matrix found by NMF algorithm.
+                - rows -> features
+                - columns -> components
+
+        Returns
+        -------
+        sparseness : list
+            A list with the sparseness for each base vector (columns of W).
+
+        REF:
+        [1] "Non-Negative Matrix Factorization with Sparseness Constraints",
+        P. O. Hoyer, Journal of Machine Learning Research (2004)
+        """
+        n = W.shape[0] # number of features / dimention of component vector
+        r = W.shape[1] # numer of components
+        norm_factor = (np.sqrt(n) - 1)
+        sparseness = []
+
+        for comp in range(r):
+            numerator = np.sqrt(n) - np.sum(abs(comp))
+            denominator = np.sqrt(np.sum(np.power(comp, 2)))
+            result = (numerator / denominator)
+            sparseness.append(result/norm_factor)
+
+        return sparseness
+
     def iter_solver(self, V, W, H, alpha):
         raise NotImplementedError
 
@@ -101,7 +152,15 @@ class NMF_SPARSE(object):
 
 class nmf_sparse_euc(NMF_SPARSE):
     """
-    Implements NMF using the Euclidean Distance Metric.
+    Implements NMF using the Euclidean Distance Metric [1] with sparsity
+    constraints proposed in [2, 3].
+
+    NMF factorization goes as:
+    V = WH; s. t. W>=0, H>=0
+
+    The cost function is:
+    np.sum(np.power(V - W.dot(H), 2)) - (alpha * np.sum(H))
+
 
     REFS:
     [1]: "Algorithms for Non-Negative Matrix Factorization", D. Lee
@@ -142,7 +201,7 @@ class nmf_sparse_euc(NMF_SPARSE):
         W = W / norm_vec[None, :]
 
         # Calculate errors
-        V_hat = W.dot(H)
+        V_hat = W.dot(H) # reconstruction
         error = np.sum(np.power(V - V_hat, 2)) # frobenius error
         sparse_error = np.sum(H)
         total_error = error + (alpha * sparse_error)
