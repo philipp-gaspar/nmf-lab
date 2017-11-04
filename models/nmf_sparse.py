@@ -47,14 +47,14 @@ class NMF_SPARSE(object):
                 W - factor matrix, shape (n, r)
                 H - coefficient matrix, shape (r, m)
         """
+        self.info = {'r': r,
+                     'V_dim_1': V.shape[0],
+                     'V_dim_2': V.shape[1],
+                     'V_type': str(V.__class__),
+                     'alpha': alpha,
+                     'max_iter': max_iter,
+                     'verbose': verbose}
         if verbose:
-            self.info = {'r': r,
-                         'V_dim_1': V.shape[0],
-                         'V_dim_2': V.shape[1],
-                         'V_type': str(V.__class__),
-                         'alpha': alpha,
-                         'max_iter': max_iter,
-                         'verbose': verbose}
             print('[NMF] Running: ')
             print(json.dumps(self.info, indent=4, sort_keys=True))
 
@@ -110,6 +110,56 @@ class NMF_SPARSE(object):
 
         return self.results
 
+    def run_repeat(self, V, r, alpha, num_trials,
+                   max_iter=100, verbose='False'):
+        """
+        Run an NMF algorithm several times with random initial values and
+        return the best result in terms of the total error function choosen.
+
+        Parameters
+        ----------
+        V : numpy.array
+            Data matrix, shape (n, m).
+                - rows -> features
+                - columns -> measurements
+        r : int
+            Number of components.
+        alpha : float
+            Sparseness parameter.
+        num_trials : int
+            Number of different trials/initializations for the NMF algorithm.
+
+        Optionals
+        ---------
+        max_iter : int
+            Maximum number of iterations.
+        verbose : boolean
+            Verbose variable.
+
+        Returns
+        -------
+        best_model : dict
+            Dictionary with the results from the best model:
+                W - factor matrix, shape (n, r)
+                H - coefficient matrix, shape (r, m)
+        """
+        if verbose:
+            print('[NMF] Running %i trials.' % (num_trials))
+
+        for trial in range(num_trials):
+            actual_model = self.run(V, r, alpha, init=None, max_iter=max_iter, \
+            verbose=False)
+            if trial == 0:
+                best_model = actual_model
+            else:
+                if actual_model['total_error'][-1] < best_model['total_error'][-1]:
+                    best_model = actual_model
+
+        if verbose:
+            print('[NMF] Best result has error = %1.3f' % best_model['total_error'][-1])
+
+        return best_model
+
     def sparseness_on_basis(self, W):
         """
         Define the sparseness of a matrix W based on the relationship
@@ -131,14 +181,15 @@ class NMF_SPARSE(object):
         [1] "Non-Negative Matrix Factorization with Sparseness Constraints",
         P. O. Hoyer, Journal of Machine Learning Research (2004)
         """
+        eps = 1e-16
         n = W.shape[0] # number of features / dimention of component vector
         r = W.shape[1] # numer of components
-        norm_factor = (np.sqrt(n) - 1)
+        norm_factor = (np.sqrt(n) - 1) + eps
         sparseness = []
 
         for comp in range(r):
             numerator = np.sqrt(n) - np.sum(abs(comp))
-            denominator = np.sqrt(np.sum(np.power(comp, 2)))
+            denominator = np.sqrt(np.sum(np.power(comp, 2))) + eps
             result = (numerator / denominator)
             sparseness.append(result/norm_factor)
 
@@ -181,18 +232,18 @@ class nmf_sparse_euc(NMF_SPARSE):
 
     def iter_solver(self, V, W, H, alpha):
         # preallocate matrix of ones
-        ones = np.ones(V.shape[0], V.shape[0])
+        ones = np.ones([V.shape[0], V.shape[0]])
 
-        # Update H
+        # Update H (This is the original multiplicative update rule)
         numerator = H * (W.T.dot(V))
         denominator = ((W.T.dot(W)).dot(H)) + alpha
         H = numerator / np.maximum(denominator, self.eps)
 
         # Update W
         HHT = H.dot(H.T)
-        aux_1 = ones.dot(W.dot(HHT) * W)
+        aux_1 = W * ones.dot(W.dot(HHT) * W)
         numerator = W * V.dot(H.T) + aux_1
-        aux_2 = ones.dot(V.dot(H.T) * W)
+        aux_2 = W * ones.dot(V.dot(H.T) * W)
         denominator = W.dot(HHT) + aux_2
         W = numerator / np.maximum(denominator, self.eps)
 
@@ -207,8 +258,8 @@ class nmf_sparse_euc(NMF_SPARSE):
         total_error = error + (alpha * sparse_error)
 
         # create a dictonary with errors
-        errors_dict {'error': error,
-                     'sparse_error': sparse_error,
-                     'total_error': total_error}
+        errors_dict = {'error': error,
+                       'sparse_error': sparse_error,
+                       'total_error': total_error}
 
         return W, H, errors_dict
