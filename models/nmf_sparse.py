@@ -5,6 +5,7 @@ import json
 import time
 
 from ..utils.matrix_utils import column_norm, scale_factor_matrices
+from ..utils.metrics import kullback_leibler_divergence
 
 class NMF_SPARSE(object):
     """
@@ -263,3 +264,67 @@ class nmf_sparse_euc(NMF_SPARSE):
                        'total_error': total_error}
 
         return W, H, errors_dict
+
+    class nmf_sparse_kl(NMF_SPARSE):
+        """
+        Implements NMF using the normalized Kullback-Leibler Divergence [1]
+        with sparsity constraints proposed in [2, 3].
+
+        NMF factorization goes as:
+        V = WH; s. t. W>=0, H>=0
+
+        The cost function is:
+        D(V|W*H) + alpha * np.sum(H)
+
+        REFS:
+        [1]: "Algorithms for Non-Negative Matrix Factorization", D. Lee
+        and S. Seung, NIPS (2001)
+        [2]: "Sparse Coding and NMF", J. Eggert and E. Korner,
+        Neural Networks (2004)
+        [3]: "Speech Separation using Non-negative Features and Sparse
+        Non-negative Matrix Factorization", M. Schmidt, Tech. Report (2007)
+        """
+        def __init__(self):
+            self.eps = 1e-16
+
+        def initializer(self, W, H):
+            norm_vec = column_norm(W, by_norm='1')
+            W = W / norm_vec[None, :]
+
+            return W, H
+
+        def iter_solver(self, V, W, H, alpha):
+            # preallocate matrix of ones
+            ones_n = np.ones([V.shape[0], V.shape[0]])
+            ones_m = np.ones([V.shape[0], V.shape[1]])
+
+            # Update H
+            WH = W.dot(H)
+            numerator = H * W.T.dot(V/WH)
+            denominator = W.T.dot(ones_m) + alpha
+            H = numerator / np.maximum(denominator, self.eps)
+
+            # Update W
+            R = V / W.dot(H)
+            aux_1 = W * ones_n.dot(ones_m.dot(H.T) * W)
+            numerator = W * (R.dot(H.T) + aux_1)
+            aux_2 = W * ones_n.dot(R.dot(H.T) * W)
+            denominator = ones_m.dot(H.T) + aux_2
+            W = numerator / np.maximum(denominator, self.eps)
+
+            # normalize columns of W
+            norm_vec = column_norm(W, by_norm='1')
+            W = W / norm_vec[None, :]
+
+            # Calculate errors
+            V_hat = W.dot(H) # reconstruction
+            error = kullback_leibler_divergence(V, V_hat)
+            sparse_error = np.sum(H)
+            total_error = error + (alpha * sparse_error)
+
+            # create dictonary with errors
+            errors_dict = {'error': error,
+                           'sparse_error': sparse_error,
+                           'total_error': total_error}
+
+            return W, H, errors_dict
