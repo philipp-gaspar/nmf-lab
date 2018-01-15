@@ -5,7 +5,7 @@ import json
 import time
 
 from ..utils.matrix_utils import column_norm, scale_factor_matrices
-from ..utils.metrics import kullback_leibler_divergence
+from ..utils.metrics import kullback_leibler_divergence, itakura_saito_divergence
 
 class NMF_SPARSE(object):
     """
@@ -318,6 +318,67 @@ class nmf_sparse_kl(NMF_SPARSE):
         # Calculate errors
         V_hat = W.dot(H) # reconstruction
         error = kullback_leibler_divergence(V, V_hat)
+        sparse_error = np.sum(H)
+        total_error = error + (alpha * sparse_error)
+
+        # create dictonary with errors
+        errors_dict = {'error': error,
+                       'sparse_error': sparse_error,
+                       'total_error': total_error}
+
+        return W, H, errors_dict
+
+class nmf_sparse_is(NMF_SPARSE):
+    """
+    Implements NMF using the Itakura-Saito Divergence [1]
+    with sparsity constraints proposed in [2].
+
+    NMF factorization goes as:
+    V = WH; s. t. W>=0, H>=0
+
+    The cost function is:
+    D(V|W*H) + alpha * np.sum(H)
+
+    REFS:
+    [1]: "Sparse NMF - half-baked or well done?", J. Le Roux,
+    F. Weninger and J. R. Hershey, Techinical Report (2015)
+    [2] "Sparse Coding and NMF", J. Eggert and E. Korner,
+    Neural Networks (2004)
+    """
+    def __init__(self):
+        self.eps = 1e-16
+
+    def initializer(self, W, H):
+        norm_vec = column_norm(W, by_norm='1')
+        W = W / norm_vec[None, :]
+
+        return W, H
+
+    def iter_solver(self, V, W, H, alpha):
+        # preallocate matrix of ones
+        ones = np.ones([V.shape[0], V.shape[0]])
+
+        # Update H
+        WH = W.dot(H)
+        numerator = H * W.T.dot(V * np.power(WH, -2))
+        denominator = W.T.dot(np.power(WH, -1)) + alpha
+        H = numerator / np.maximum(denominator, self.eps)
+
+        # Update W
+        WH = W.dot(H)
+        aux_1 = W * ones.dot(np.power(WH, -1).dot(H.T))
+        numerator = W * ( (V / np.power(WH, 2)).dot(H.T) + aux_1 )
+        aux_2 = W * ones.dot(((V / np.power(WH, 2)).dot(H.T)) * W)
+        denominator = np.power(WH, -1).dot(H.T) + aux_2
+        W = numerator / np.maximum(denominator, self.eps)
+
+        # normalize columns of W
+        norm_vec = column_norm(W, by_norm='1')
+        W = W / norm_vec[None, :]
+
+        # Calculate errors
+        V_hat = W.dot(H) # reconstruction
+        error = itakura_saito_divergence(V, V_hat)
         sparse_error = np.sum(H)
         total_error = error + (alpha * sparse_error)
 
