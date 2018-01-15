@@ -5,7 +5,9 @@ import json
 import time
 
 from ..utils.matrix_utils import column_norm, scale_factor_matrices
-from ..utils.metrics import kullback_leibler_divergence, itakura_saito_divergence
+from ..utils.metrics import frobenius_norm, \
+                            kullback_leibler_divergence, \
+                            itakura_saito_divergence
 
 class NMF_SPARSE(object):
     """
@@ -253,7 +255,7 @@ class nmf_sparse_euc(NMF_SPARSE):
 
         # Calculate errors
         V_hat = W.dot(H) # reconstruction
-        error = np.sum(np.power(V - V_hat, 2)) # frobenius error
+        error = frobenius_norm(V, V_hat)
         sparse_error = np.sum(H)
         total_error = error + (alpha * sparse_error)
 

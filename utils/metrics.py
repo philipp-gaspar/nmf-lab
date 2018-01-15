@@ -1,6 +1,8 @@
 import numpy as np
 
-__all__ = ['frobenius_norm']
+__all__ = ['frobenius_norm',
+           'kullback_leibler_divergence',
+           'itakura_saito_divergence']
 
 def frobenius_norm(Y, Y_hat):
     """
@@ -16,10 +18,10 @@ def frobenius_norm(Y, Y_hat):
     Returns
     -------
     error : float
-        Calculated error using the Frobenius Norm.
+        Calculated error based on the Frobenius Norm
+        (Squared Euclidean Distance).
     """
-    diff = Y - Y_hat
-    error = 0.5 * np.linalg.norm(diff, ord='fro')
+    error = 0.5 * np.power((Y - Y_hat), 2).sum(axis=None)
 
     return error
 
