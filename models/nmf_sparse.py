@@ -233,19 +233,18 @@ class nmf_sparse_euc(NMF_SPARSE):
 
     def iter_solver(self, V, W, H, alpha):
         # preallocate matrix of ones
+        # which is a square matrix (n x n)
         ones = np.ones([V.shape[0], V.shape[0]])
 
         # Update H (This is the original multiplicative update rule)
         numerator = H * (W.T.dot(V))
-        denominator = ((W.T.dot(W)).dot(H)) + alpha
+        denominator = W.T.dot(W.dot(H)) + alpha
         H = numerator / np.maximum(denominator, self.eps)
 
         # Update W
         HHT = H.dot(H.T)
-        aux_1 = W * ones.dot(W.dot(HHT) * W)
-        numerator = W * V.dot(H.T) + aux_1
-        aux_2 = W * ones.dot(V.dot(H.T) * W)
-        denominator = W.dot(HHT) + aux_2
+        numerator = W * V.dot(H.T) + W * ones.dot(W.dot(HHT) * W)
+        denominator = W.dot(HHT) + W * ones.dot(V.dot(H.T) * W)
         W = numerator / np.maximum(denominator, self.eps)
 
         # normalize columns of W
