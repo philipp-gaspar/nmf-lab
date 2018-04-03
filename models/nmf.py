@@ -125,7 +125,9 @@ class NMF(object):
     def run_repeat(self, V, r, num_trials,
                    max_iter=default_max_iter,
                    cost_function='frobenius',
-                   verbose=False):
+                   verbose=False,
+                   save_init=False,
+                   file_name=None):
         """
         Run an NMF algorithm several times with random
         initial values and return the best results in terms
@@ -154,6 +156,8 @@ class NMF(object):
                 - 'itakura-saito
         verbose : boolean
             Verbose variable.
+        save_init : boolean
+            Save the model for each initialization
 
         Returns
         -------
@@ -177,6 +181,11 @@ class NMF(object):
             else:
                 if actual_model['error'][-1] < best_model['error'][-1]:
                     best_model = actual_model
+
+            if save_init:
+                name = file_name + 'init%i.pkl' % (trial+1)
+                print(name)
+            #     pickle.dump(actual_model, open(name, 'wb'))
 
         if verbose:
             print '[NMF] Best result has error = %1.3f' % best_model['error'][-1]
