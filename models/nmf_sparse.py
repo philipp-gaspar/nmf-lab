@@ -4,6 +4,8 @@ import numpy as np
 import json
 import time
 
+import pickle
+
 from ..utils.matrix_utils import column_norm, scale_factor_matrices
 from ..utils.metrics import frobenius_norm, \
                             kullback_leibler_divergence, \
@@ -114,7 +116,8 @@ class NMF_SPARSE(object):
         return self.results
 
     def run_repeat(self, V, r, alpha, num_trials,
-                   max_iter=100, verbose='False'):
+                   max_iter=100, verbose=False,
+                   save_init=False, file_name=None):
         """
         Run an NMF algorithm several times with random initial values and
         return the best result in terms of the total error function choosen.
@@ -138,6 +141,11 @@ class NMF_SPARSE(object):
             Maximum number of iterations.
         verbose : boolean
             Verbose variable.
+        save_init : boolean
+            Save the model for each initialization.
+        file_name : str
+            Name of the model for each initialization.
+            Only necessary if 'save_init' equals True.
 
         Returns
         -------
@@ -157,6 +165,10 @@ class NMF_SPARSE(object):
             else:
                 if actual_model['total_error'][-1] < best_model['total_error'][-1]:
                     best_model = actual_model
+
+            if save_init:
+                name = file_name + '_init%i.pkl' % (trial+1)
+                pickle.dump(actual_model, open(name, 'wb'))
 
         if verbose:
             print('[NMF] Best result has error = %1.3f' % best_model['total_error'][-1])
