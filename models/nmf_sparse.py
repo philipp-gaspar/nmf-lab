@@ -82,7 +82,7 @@ class NMF_SPARSE(object):
         self.results = {'n_components': r,
                         'alpha': alpha,
                         'iter': [],
-                        'error': [],
+                        'original_error': [],
                         'sparse_error': [],
                         'total_error': [],
                         'sparseness_W': []}
@@ -91,7 +91,7 @@ class NMF_SPARSE(object):
         for it in range(1, max_iter+1):
             W, H, errors_dict = self.iter_solver(V, W, H, alpha)
             self.results['iter'].append(it)
-            self.results['error'].append(errors_dict['error'])
+            self.results['original_error'].append(errors_dict['original_error'])
             self.results['sparse_error'].append(errors_dict['sparse_error'])
             self.results['total_error'].append(errors_dict['total_error'])
 
@@ -267,12 +267,12 @@ class nmf_sparse_euc(NMF_SPARSE):
 
         # Calculate errors
         V_hat = W.dot(H) # reconstruction
-        error = frobenius_norm(V, V_hat)
-        sparse_error = np.sum(H)
-        total_error = error + (alpha * sparse_error)
+        original_error = frobenius_norm(V, V_hat)
+        sparse_error = alpha * np.sum(H)
+        total_error = original_error + sparse_error
 
         # create a dictonary with errors
-        errors_dict = {'error': error,
+        errors_dict = {'original_error': original_error,
                        'sparse_error': sparse_error,
                        'total_error': total_error}
 
