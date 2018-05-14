@@ -105,7 +105,7 @@ class NMF_SPARSE(object):
             self.results['sparseness_W'].append(sparseness_W)
 
         # Normalize matrices W and H in order to not modify their product
-        W, H = scale_factor_matrices(W, H, by_norm='1')
+        # W, H = scale_factor_matrices(W, H, by_norm='2')
 
         self.results['W'] = W
         self.results['H'] = H
@@ -249,8 +249,10 @@ class nmf_sparse_euc(NMF_SPARSE):
         self.eps = 1e-16
 
     def initializer(self, W, H):
-        norm_vec = column_norm(W, by_norm='1')
-        W = W / norm_vec[None, :]
+        #norm_vec = column_norm(W, by_norm='1')
+        #W = W / norm_vec[None, :]
+
+        W, H = scale_factor_matrices(W, H, by_norm='2')
 
         return W, H
 
@@ -273,15 +275,18 @@ class nmf_sparse_euc(NMF_SPARSE):
             numerator = W * V.dot(H.T) + W * ones.dot(W.dot(HHT) * W)
             denominator = W.dot(HHT) + W * ones.dot(V.dot(H.T) * W)
             W = numerator / np.maximum(denominator, self.eps)
+
+            # normalize columns of W
+            norm_vec = column_norm(W, by_norm='1')
+            W = W / norm_vec[None, :]
         else:
             # - Half-Baked NMF (Without sparsity on W)
             numerator = W * (V.dot(H.T))
             denominator = W.dot(H.dot(H.T)) + self.eps
             W = numerator / denominator
 
-        # normalize columns of W
-        norm_vec = column_norm(W, by_norm='1')
-        W = W / norm_vec[None, :]
+            # normalize and rescale W and H
+            W, H = scale_factor_matrices(W, H, by_norm='2')
 
         # Calculate errors
         V_hat = W.dot(H) # reconstruction
