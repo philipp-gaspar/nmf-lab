@@ -20,7 +20,8 @@ class NMF_SPARSE(object):
         # NMF_SPARSE is a Base class and cannot be instantiated
         raise NotImplementedError()
 
-    def run(self, V, r, alpha, init=None, max_iter=100, verbose=False):
+    def run(self, V, r, alpha, sparse_W,
+            init=None, max_iter=100, verbose=False):
         """
         Run a particular Sparse NMF algorithm.
         NMF factorization go as: V = WH
@@ -35,6 +36,8 @@ class NMF_SPARSE(object):
             Nunber of components.
         alpha : float
             Sparseness parameter.
+        sparse_W : boolean
+            Apply sparsity on W matrix.
 
         Optionals
         ---------
@@ -57,6 +60,7 @@ class NMF_SPARSE(object):
                      'V_dim_2': V.shape[1],
                      'V_type': str(V.__class__),
                      'alpha': alpha,
+                     'sparse_W': sparse_W,
                      'max_iter': max_iter,
                      'verbose': verbose}
         if verbose:
@@ -81,6 +85,7 @@ class NMF_SPARSE(object):
         # Dictionary to save the results for each iteration
         self.results = {'n_components': r,
                         'alpha': alpha,
+                        'sparse_W': sparse_W,
                         'iter': [],
                         'original_error': [],
                         'sparse_error': [],
@@ -89,7 +94,7 @@ class NMF_SPARSE(object):
 
         # Iteration process
         for it in range(1, max_iter+1):
-            W, H, errors_dict = self.iter_solver(V, W, H, alpha)
+            W, H, errors_dict = self.iter_solver(V, W, H, alpha, sparse_W)
             self.results['iter'].append(it)
             self.results['original_error'].append(errors_dict['original_error'])
             self.results['sparse_error'].append(errors_dict['sparse_error'])
@@ -115,7 +120,7 @@ class NMF_SPARSE(object):
 
         return self.results
 
-    def run_repeat(self, V, r, alpha, num_trials,
+    def run_repeat(self, V, r, alpha, sparse_W, num_trials,
                    max_iter=100, verbose=False,
                    save_init=False, file_name=None):
         """
@@ -132,6 +137,8 @@ class NMF_SPARSE(object):
             Number of components.
         alpha : float
             Sparseness parameter.
+        sparse_W : boolean
+            Apply sparsity on W matrix.
         num_trials : int
             Number of different trials/initializations for the NMF algorithm.
 
@@ -158,8 +165,10 @@ class NMF_SPARSE(object):
             print('[NMF] Running %i trials.' % (num_trials))
 
         for trial in range(num_trials):
-            actual_model = self.run(V, r, alpha, init=None, max_iter=max_iter, \
-            verbose=False)
+            actual_model = self.run(V, r, alpha, sparse_W,
+                                    init=None,
+                                    max_iter=max_iter,
+                                    verbose=False)
             if trial == 0:
                 best_model = actual_model
             else:
@@ -210,7 +219,7 @@ class NMF_SPARSE(object):
 
         return sparseness
 
-    def iter_solver(self, V, W, H, alpha):
+    def iter_solver(self, V, W, H, alpha, sparse_W):
         raise NotImplementedError
 
     def initializer(self, W, H):
@@ -245,21 +254,30 @@ class nmf_sparse_euc(NMF_SPARSE):
 
         return W, H
 
-    def iter_solver(self, V, W, H, alpha):
+    def iter_solver(self, V, W, H, alpha, sparse_W):
         # preallocate matrix of ones
         # which is a square matrix (n x n)
         ones = np.ones([V.shape[0], V.shape[0]])
 
-        # Update H (This is the original multiplicative update rule)
+        # Update H
+        # - This is the original multiplicative update rule, except for
+        #   the alpha constant in the denominator
         numerator = H * (W.T.dot(V))
         denominator = W.T.dot(W.dot(H)) + alpha
         H = numerator / np.maximum(denominator, self.eps)
 
         # Update W
-        HHT = H.dot(H.T)
-        numerator = W * V.dot(H.T) + W * ones.dot(W.dot(HHT) * W)
-        denominator = W.dot(HHT) + W * ones.dot(V.dot(H.T) * W)
-        W = numerator / np.maximum(denominator, self.eps)
+        if sparse_W:
+            # - Well-Done NMF (With sparsity on W)
+            HHT = H.dot(H.T)
+            numerator = W * V.dot(H.T) + W * ones.dot(W.dot(HHT) * W)
+            denominator = W.dot(HHT) + W * ones.dot(V.dot(H.T) * W)
+            W = numerator / np.maximum(denominator, self.eps)
+        else:
+            # - Half-Baked NMF (Without sparsity on W)
+            numerator = W * (V.dot(H.T))
+            denominator = W.dot(H.dot(H.T)) + self.eps
+            W = numerator / denominator
 
         # normalize columns of W
         norm_vec = column_norm(W, by_norm='1')
