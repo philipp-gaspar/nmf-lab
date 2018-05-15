@@ -21,7 +21,7 @@ class NMF_SPARSE(object):
         raise NotImplementedError()
 
     def run(self, V, r, alpha, sparse_W,
-            init=None, max_iter=100, verbose=False):
+            norm='1', init=None, max_iter=100, verbose=False):
         """
         Run a particular Sparse NMF algorithm.
         NMF factorization go as: V = WH
@@ -41,6 +41,9 @@ class NMF_SPARSE(object):
 
         Optionals
         ---------
+        norm : str
+            - '1' for L1 normalization
+            - '2' for L2 normalization
         init : list
             List with initial W and H matrices.
         max_iter : int
@@ -61,6 +64,7 @@ class NMF_SPARSE(object):
                      'V_type': str(V.__class__),
                      'alpha': alpha,
                      'sparse_W': sparse_W,
+                     'norm': norm,
                      'max_iter': max_iter,
                      'verbose': verbose}
         if verbose:
@@ -80,12 +84,13 @@ class NMF_SPARSE(object):
         start = time.time()
 
         # Algorithm specific initialization
-        W, H = self.initializer(W, H)
+        W, H = self.initializer(W, H, norm)
 
         # Dictionary to save the results for each iteration
         self.results = {'n_components': r,
                         'alpha': alpha,
                         'sparse_W': sparse_W,
+                        'norm': norm,
                         'iter': [],
                         'original_error': [],
                         'sparse_error': [],
@@ -94,7 +99,8 @@ class NMF_SPARSE(object):
 
         # Iteration process
         for it in range(1, max_iter+1):
-            W, H, errors_dict = self.iter_solver(V, W, H, alpha, sparse_W)
+            W, H, errors_dict = self.iter_solver(V, W, H,
+                                                 alpha, sparse_W, norm)
             self.results['iter'].append(it)
             self.results['original_error'].append(errors_dict['original_error'])
             self.results['sparse_error'].append(errors_dict['sparse_error'])
@@ -105,7 +111,7 @@ class NMF_SPARSE(object):
             self.results['sparseness_W'].append(sparseness_W)
 
         # Normalize matrices W and H in order to not modify their product
-        # W, H = scale_factor_matrices(W, H, by_norm='2')
+        W, H = scale_factor_matrices(W, H, by_norm='1')
 
         self.results['W'] = W
         self.results['H'] = H
@@ -120,7 +126,7 @@ class NMF_SPARSE(object):
 
         return self.results
 
-    def run_repeat(self, V, r, alpha, sparse_W, num_trials,
+    def run_repeat(self, V, r, alpha, sparse_W, norm, num_trials,
                    max_iter=100, verbose=False,
                    save_init=False, file_name=None):
         """
@@ -139,6 +145,9 @@ class NMF_SPARSE(object):
             Sparseness parameter.
         sparse_W : boolean
             Apply sparsity on W matrix.
+        norm : str
+            - 'L1' normalization after each iteration
+            - 'L2' normalization after each iteration
         num_trials : int
             Number of different trials/initializations for the NMF algorithm.
 
@@ -165,7 +174,7 @@ class NMF_SPARSE(object):
             print('[NMF] Running %i trials.' % (num_trials))
 
         for trial in range(num_trials):
-            actual_model = self.run(V, r, alpha, sparse_W,
+            actual_model = self.run(V, r, alpha, sparse_W, norm,
                                     init=None,
                                     max_iter=max_iter,
                                     verbose=False)
@@ -219,10 +228,10 @@ class NMF_SPARSE(object):
 
         return sparseness
 
-    def iter_solver(self, V, W, H, alpha, sparse_W):
+    def iter_solver(self, V, W, H, alpha, sparse_W, norm):
         raise NotImplementedError
 
-    def initializer(self, W, H):
+    def initializer(self, W, H, norm):
         return W, H
 
 class nmf_sparse_euc(NMF_SPARSE):
@@ -248,15 +257,12 @@ class nmf_sparse_euc(NMF_SPARSE):
     def __init__(self):
         self.eps = 1e-16
 
-    def initializer(self, W, H):
-        #norm_vec = column_norm(W, by_norm='1')
-        #W = W / norm_vec[None, :]
-
-        W, H = scale_factor_matrices(W, H, by_norm='2')
+    def initializer(self, W, H, norm):
+        W, H = scale_factor_matrices(W, H, by_norm=norm)
 
         return W, H
 
-    def iter_solver(self, V, W, H, alpha, sparse_W):
+    def iter_solver(self, V, W, H, alpha, sparse_W, norm):
         # preallocate matrix of ones
         # which is a square matrix (n x n)
         ones = np.ones([V.shape[0], V.shape[0]])
@@ -277,7 +283,7 @@ class nmf_sparse_euc(NMF_SPARSE):
             W = numerator / np.maximum(denominator, self.eps)
 
             # normalize columns of W
-            norm_vec = column_norm(W, by_norm='1')
+            norm_vec = column_norm(W, by_norm=norm)
             W = W / norm_vec[None, :]
         else:
             # - Half-Baked NMF (Without sparsity on W)
@@ -286,7 +292,7 @@ class nmf_sparse_euc(NMF_SPARSE):
             W = numerator / denominator
 
             # normalize and rescale W and H
-            W, H = scale_factor_matrices(W, H, by_norm='2')
+            W, H = scale_factor_matrices(W, H, by_norm=norm)
 
         # Calculate errors
         V_hat = W.dot(H) # reconstruction
