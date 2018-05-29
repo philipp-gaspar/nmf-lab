@@ -263,10 +263,6 @@ class nmf_sparse_euc(NMF_SPARSE):
         return W, H
 
     def iter_solver(self, V, W, H, alpha, sparse_W, norm):
-        # preallocate matrix of ones
-        # which is a square matrix (n x n)
-        ones = np.ones([V.shape[0], V.shape[0]])
-
         # Update H
         # - This is the original multiplicative update rule, except for
         #   the alpha constant in the denominator
@@ -277,6 +273,10 @@ class nmf_sparse_euc(NMF_SPARSE):
         # Update W
         if sparse_W:
             # - Well-Done NMF (With sparsity on W)
+            # preallocate matrix of ones
+            # which is a square matrix (n x n)
+            ones = np.ones([V.shape[0], V.shape[0]])
+
             HHT = H.dot(H.T)
             numerator = W * V.dot(H.T) + W * ones.dot(W.dot(HHT) * W)
             denominator = W.dot(HHT) + W * ones.dot(V.dot(H.T) * W)
