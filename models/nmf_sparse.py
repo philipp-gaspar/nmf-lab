@@ -408,36 +408,47 @@ class nmf_sparse_is(NMF_SPARSE):
 
         return W, H
 
-    def iter_solver(self, V, W, H, alpha):
-        # preallocate matrix of ones
-        ones = np.ones([V.shape[0], V.shape[0]])
-
+    def iter_solver(self, V, W, H, alpha, sparse_W, norm):
         # Update H
+        # - This is the original update rule, except for
+        #   the alpha constant in the denominator
         WH = W.dot(H)
         numerator = H * W.T.dot(V * np.power(WH, -2))
         denominator = W.T.dot(np.power(WH, -1)) + alpha
         H = numerator / np.maximum(denominator, self.eps)
 
         # Update W
-        WH = W.dot(H)
-        aux_1 = W * ones.dot(np.power(WH, -1).dot(H.T))
-        numerator = W * ( (V / np.power(WH, 2)).dot(H.T) + aux_1 )
-        aux_2 = W * ones.dot(((V / np.power(WH, 2)).dot(H.T)) * W)
-        denominator = np.power(WH, -1).dot(H.T) + aux_2
-        W = numerator / np.maximum(denominator, self.eps)
+        if sparse_W:
+            # - Well-Done NMF (With sparsity on W)
+            ones = np.ones([V.shape[0], V.shape[0]])
+            WH = W.dot(H)
+            aux_1 = W * ones.dot(np.power(WH, -1).dot(H.T))
+            numerator = W * ( (V / np.power(WH, 2)).dot(H.T) + aux_1 )
+            aux_2 = W * ones.dot(((V / np.power(WH, 2)).dot(H.T)) * W)
+            denominator = np.power(WH, -1).dot(H.T) + aux_2
+            W = numerator / np.maximum(denominator, self.eps)
 
-        # normalize columns of W
-        norm_vec = column_norm(W, by_norm='1')
-        W = W / norm_vec[None, :]
+            # normalize columns of W
+            norm_vec = column_norm(W, by_norm='1')
+            W = W / norm_vec[None, :]
+        else:
+            # Half-Baked NMF (Without sparsity on W)
+            WH = W.dot(H)
+            numerator = W * (V / np.power(WH, 2)).dot(H.T)
+            denominator = (1 / WH).dot(H.T)
+            W = numerator / np.maximum(denominator, self.eps)
+
+            # normalize and rescale W and H
+            W, H = scale_factor_matrices(W, H, by_norm=norm)
 
         # Calculate errors
         V_hat = W.dot(H) # reconstruction
-        error = itakura_saito_divergence(V, V_hat)
-        sparse_error = np.sum(H)
-        total_error = error + (alpha * sparse_error)
+        original_error = itakura_saito_divergence(V, V_hat)
+        sparse_error = alpha * np.sum(H)
+        total_error = error + sparse_error
 
         # create dictonary with errors
-        errors_dict = {'error': error,
+        errors_dict = {'original_error': original_error,
                        'sparse_error': sparse_error,
                        'total_error': total_error}
 
