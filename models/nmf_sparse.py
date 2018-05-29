@@ -403,9 +403,8 @@ class nmf_sparse_is(NMF_SPARSE):
     def __init__(self):
         self.eps = 1e-16
 
-    def initializer(self, W, H):
-        norm_vec = column_norm(W, by_norm='1')
-        W = W / norm_vec[None, :]
+    def initializer(self, W, H, norm):
+        W, H = scale_factor_matrices(W, H, by_norm=norm)
 
         return W, H
 
