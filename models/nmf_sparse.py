@@ -334,37 +334,50 @@ class nmf_sparse_kl(NMF_SPARSE):
 
         return W, H
 
-    def iter_solver(self, V, W, H, alpha):
+    def iter_solver(self, V, W, H, alpha, sparse_W, norm):
         # preallocate matrix of ones
         ones_n = np.ones([V.shape[0], V.shape[0]])
         ones_m = np.ones([V.shape[0], V.shape[1]])
 
         # Update H
+        # - This is the original update rule, except for
+        #   the alpha constant in the denominator
         WH = W.dot(H)
         numerator = H * W.T.dot(V/WH)
         denominator = W.T.dot(ones_m) + alpha
         H = numerator / np.maximum(denominator, self.eps)
 
         # Update W
-        R = V / W.dot(H)
-        aux_1 = W * ones_n.dot(ones_m.dot(H.T) * W)
-        numerator = W * (R.dot(H.T) + aux_1)
-        aux_2 = W * ones_n.dot(R.dot(H.T) * W)
-        denominator = ones_m.dot(H.T) + aux_2
-        W = numerator / np.maximum(denominator, self.eps)
+        if sparse_W:
+            # - Well-Done NMF (With sparsity on W)
+            R = V / W.dot(H)
+            aux_1 = W * ones_n.dot(ones_m.dot(H.T) * W)
+            numerator = W * (R.dot(H.T) + aux_1)
+            aux_2 = W * ones_n.dot(R.dot(H.T) * W)
+            denominator = ones_m.dot(H.T) + aux_2
+            W = numerator / np.maximum(denominator, self.eps)
 
-        # normalize columns of W
-        norm_vec = column_norm(W, by_norm='1')
-        W = W / norm_vec[None, :]
+            # normalize and rescale W and H
+            W, H = scale_factor_matrices(W, H, by_norm=norm)
+
+        else:
+            # - Half-Baked NMF (Without sparsity on W)
+            WH = W.dot(H)
+            numerator = W * ((V/WH).dot(H.T))
+            denominator = ones_m.dot(H.T)
+            W = numerator / np.maximum(denominator, self.eps)
+
+            # normalize and rescale W and H
+            W, H = scale_factor_matrices(W, H, by_norm=norm)
 
         # Calculate errors
         V_hat = W.dot(H) # reconstruction
-        error = kullback_leibler_divergence(V, V_hat)
-        sparse_error = np.sum(H)
-        total_error = error + (alpha * sparse_error)
+        original_error = kullback_leibler_divergence(V, V_hat)
+        sparse_error = alpha * np.sum(H)
+        total_error = original_error + sparse_error
 
         # create dictonary with errors
-        errors_dict = {'error': error,
+        errors_dict = {'original_error': original_error,
                        'sparse_error': sparse_error,
                        'total_error': total_error}
 
