@@ -412,7 +412,7 @@ class nmf_sparse_is(NMF_SPARSE):
         # Update H
         # - This is the original update rule, except for
         #   the alpha constant in the denominator
-        WH = W.dot(H)
+        WH = W.dot(H) + self.eps
         numerator = H * W.T.dot(V * np.power(WH, -2))
         denominator = W.T.dot(np.power(WH, -1)) + alpha
         H = numerator / np.maximum(denominator, self.eps)
@@ -433,7 +433,7 @@ class nmf_sparse_is(NMF_SPARSE):
             W = W / norm_vec[None, :]
         else:
             # Half-Baked NMF (Without sparsity on W)
-            WH = W.dot(H)
+            WH = W.dot(H) + self.eps
             numerator = W * (V / np.power(WH, 2)).dot(H.T)
             denominator = (1 / WH).dot(H.T)
             W = numerator / np.maximum(denominator, self.eps)
@@ -442,10 +442,10 @@ class nmf_sparse_is(NMF_SPARSE):
             W, H = scale_factor_matrices(W, H, by_norm=norm)
 
         # Calculate errors
-        V_hat = W.dot(H) # reconstruction
+        V_hat = W.dot(H) + self.eps # reconstruction
         original_error = itakura_saito_divergence(V, V_hat)
         sparse_error = alpha * np.sum(H)
-        total_error = error + sparse_error
+        total_error = original_error + sparse_error
 
         # create dictonary with errors
         errors_dict = {'original_error': original_error,
