@@ -342,7 +342,7 @@ class nmf_sparse_kl(NMF_SPARSE):
         # Update H
         # - This is the original update rule, except for
         #   the alpha constant in the denominator
-        WH = W.dot(H)
+        WH = W.dot(H) + self.eps
         numerator = H * W.T.dot(V/WH)
         denominator = W.T.dot(ones_m) + alpha
         H = numerator / np.maximum(denominator, self.eps)
@@ -362,7 +362,7 @@ class nmf_sparse_kl(NMF_SPARSE):
 
         else:
             # - Half-Baked NMF (Without sparsity on W)
-            WH = W.dot(H)
+            WH = W.dot(H) + self.eps
             numerator = W * ((V/WH).dot(H.T))
             denominator = ones_m.dot(H.T)
             W = numerator / np.maximum(denominator, self.eps)
@@ -371,7 +371,7 @@ class nmf_sparse_kl(NMF_SPARSE):
             W, H = scale_factor_matrices(W, H, by_norm=norm)
 
         # Calculate errors
-        V_hat = W.dot(H) # reconstruction
+        V_hat = W.dot(H) + self.eps # reconstruction
         original_error = kullback_leibler_divergence(V, V_hat)
         sparse_error = alpha * np.sum(H)
         total_error = original_error + sparse_error

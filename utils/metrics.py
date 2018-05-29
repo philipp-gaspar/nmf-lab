@@ -42,7 +42,13 @@ def kullback_leibler_divergence(Y, Y_hat):
         Calculated error using the KL divergence.
     """
     eps = 1e-16
-    error = ((Y * np.log((Y/Y_hat) + eps)) - Y + Y_hat).sum(axis=None)
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        ratio = np.true_divide(Y, Y_hat)
+        ratio[ratio == np.inf] = 0
+        ratio = np.nan_to_num(ratio)
+
+    error = ((Y * np.log(ratio + eps)) - Y + Y_hat).sum(axis=None)
 
     return error
 
